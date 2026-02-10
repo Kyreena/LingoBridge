@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>LingoBridge – Speech to ASL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+    <!-- ================= HEADER ================= -->
+    <header class="header">
+        <h1>LingoBridge</h1>
+        <p>Real-time Speech to ASL Interpretation</p>
+    </header>
+
+
+    <!-- ================= APP CONTAINER ================= -->
+    <main class="app">
+
+        <!-- ======= MAIN CONTENT AREA ======= -->
+        <section class="main-content">
+
+            <!-- TRANSCRIPT PANEL -->
+            <section class="card transcript-panel">
+                <h2>Live Transcript</h2>
+
+                <!-- This will scroll like lyrics -->
+                <div id="transcript" class="transcript">
+                    <!-- Lines will be appended here by JS -->
+                    <p class="placeholder">Waiting for speech...</p>
+                </div>
+            </section>
+
+            <!-- ASL VIDEO PANEL -->
+            <section class="card video-panel">
+                <h2>ASL Interpretation</h2>
+
+                <div class="video-wrapper">
+                    <video
+                        id="aslVideo"
+                        controls
+                        autoplay
+                        muted
+                        playsinline
+                    >
+                        <source src="" type="video/mp4" />
+                        Your browser does not support video playback.
+                    </video>
+                </div>
+            </section>
+
+        </section>
+
+
+        <!-- ======= MEDIA CONTROLS ======= -->
+        <section class="controls">
+
+            <button id="start-btn" class="control-btn">
+                ▶ Start
+            </button>
+
+            <button id="pause-btn" class="control-btn">
+                ⏸ Pause
+            </button>
+
+            <button id="stop-btn" class="control-btn">
+                ⏹ Stop
+            </button>
+
+        </section>
+
+    </main>
+
+
+    <!-- ================= JS ================= -->
+    <script src="script.js"></script>
+
+</body>
+</html>
