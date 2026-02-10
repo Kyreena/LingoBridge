@@ -6,7 +6,7 @@ LingoBridge is a web-based real-time speech-to-sign language translation system 
 
 ![LingoBridge Demo](https://img.shields.io/badge/Status-Active-success)
 ![Language](https://img.shields.io/badge/Language-JavaScript-yellow)
-![ASL Signs](https://img.shields.io/badge/ASL%20Signs-70+-blue)
+![ASL Signs](https://img.shields.io/badge/ASL%20Signs-56-blue)
 
 ## 🎯 Features
 
@@ -82,7 +82,7 @@ The system consists of three main components:
 
 2. **ASL Library** (`asl-library.js`)
    - Maps English words to ASL video URLs
-   - Currently includes 70+ common words and phrases
+   - Currently includes 56 common words and phrases
    - Easily extensible with more signs
 
 3. **User Interface** (`index.html`, `styles.css`)

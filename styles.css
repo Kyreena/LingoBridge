@@ -132,7 +132,7 @@ main {
     margin-bottom: 30px;
 }
 
-@media (max-width: 968px) {
+@media (max-width: 768px) {
     .content-grid {
         grid-template-columns: 1fr;
     }

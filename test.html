@@ -252,37 +252,36 @@
             
             // Test a few video URLs
             const testWords = ['hello', 'thank', 'yes', 'help', 'good'];
-            let output = '';
-            let testCount = 0;
+            const promises = [];
             
             testWords.forEach(word => {
                 if (hasASLSign(word)) {
                     const sign = getASLSign(word);
-                    const img = new Image();
                     
                     // Try to load the video thumbnail
-                    fetch(sign.video, { method: 'HEAD' })
+                    const promise = fetch(sign.video, { method: 'HEAD' })
                         .then(response => {
-                            testCount++;
                             if (response.ok) {
-                                output += `<div class="test-result test-pass">✓ Video accessible: "${word}"</div>`;
+                                return { word, status: 'pass', message: `✓ Video accessible: "${word}"` };
                             } else {
-                                output += `<div class="test-result test-fail">✗ Video not accessible: "${word}" (${response.status})</div>`;
-                            }
-                            
-                            if (testCount === testWords.length) {
-                                results.innerHTML = output;
+                                return { word, status: 'fail', message: `✗ Video not accessible: "${word}" (${response.status})` };
                             }
                         })
                         .catch(error => {
-                            testCount++;
-                            output += `<div class="test-result test-info">⚠ Could not verify: "${word}" (CORS or network issue)</div>`;
-                            
-                            if (testCount === testWords.length) {
-                                results.innerHTML = output;
-                            }
+                            return { word, status: 'info', message: `⚠ Could not verify: "${word}" (CORS or network issue)` };
                         });
+                    
+                    promises.push(promise);
                 }
+            });
+            
+            // Wait for all tests to complete
+            Promise.all(promises).then(testResults => {
+                let output = '';
+                testResults.forEach(result => {
+                    output += `<div class="test-result test-${result.status}">${result.message}</div>`;
+                });
+                results.innerHTML = output;
             });
         }
         

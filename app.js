@@ -21,6 +21,7 @@ class LingoBridge {
         this.videoContainer = document.getElementById('videoContainer');
         this.aslVideo = document.getElementById('aslVideo');
         this.currentWordDisplay = document.getElementById('currentWord');
+        this.videoPlaceholder = document.querySelector('.video-placeholder');
         
         this.initializeSpeechRecognition();
         this.setupEventListeners();
@@ -148,7 +149,9 @@ class LingoBridge {
         this.aslVideo.pause();
         this.aslVideo.src = '';
         this.aslVideo.classList.remove('active');
-        document.querySelector('.video-placeholder').style.display = 'flex';
+        if (this.videoPlaceholder) {
+            this.videoPlaceholder.style.display = 'flex';
+        }
         
         this.updateStatus('Cleared. Ready to start.');
     }
@@ -250,7 +253,9 @@ class LingoBridge {
             
             // Hide video, show placeholder
             this.aslVideo.classList.remove('active');
-            document.querySelector('.video-placeholder').style.display = 'flex';
+            if (this.videoPlaceholder) {
+                this.videoPlaceholder.style.display = 'flex';
+            }
             return;
         }
         
@@ -270,7 +275,9 @@ class LingoBridge {
         this.aslVideo.load();
         
         // Show video, hide placeholder
-        document.querySelector('.video-placeholder').style.display = 'none';
+        if (this.videoPlaceholder) {
+            this.videoPlaceholder.style.display = 'none';
+        }
         this.aslVideo.classList.add('active');
         
         // Play video
