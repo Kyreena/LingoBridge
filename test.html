@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LingoBridge - Test Suite</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #667eea;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .test-pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        .word-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .word-item {
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 LingoBridge Test Suite</h1>
+    
+    <div class="test-section">
+        <h2>1. ASL Library Tests</h2>
+        <button onclick="testASLLibrary()">Run Library Tests</button>
+        <div id="libraryResults"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Available ASL Signs</h2>
+        <p>Total signs in library: <strong id="signCount">-</strong></p>
+        <button onclick="showAvailableWords()">Show All Words</button>
+        <div id="wordList" class="word-list"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Word Lookup Tests</h2>
+        <input type="text" id="testWord" placeholder="Enter a word to test" style="padding: 10px; width: 300px; border: 1px solid #ddd; border-radius: 5px;">
+        <button onclick="testWordLookup()">Test Word</button>
+        <div id="lookupResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. Browser Compatibility</h2>
+        <button onclick="testBrowserSupport()">Check Browser Support</button>
+        <div id="browserResults"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>5. Video URL Tests</h2>
+        <button onclick="testVideoURLs()">Test Sample Video URLs</button>
+        <div id="videoResults"></div>
+    </div>
+
+    <script src="asl-library.js"></script>
+    <script>
+        function testASLLibrary() {
+            const results = document.getElementById('libraryResults');
+            let output = '';
+            let passCount = 0;
+            let failCount = 0;
+            
+            // Test 1: Library is loaded
+            if (typeof ASL_LIBRARY !== 'undefined') {
+                output += '<div class="test-result test-pass">✓ ASL Library loaded successfully</div>';
+                passCount++;
+            } else {
+                output += '<div class="test-result test-fail">✗ ASL Library not loaded</div>';
+                failCount++;
+            }
+            
+            // Test 2: Library has entries
+            const signCount = getSignCount();
+            if (signCount > 0) {
+                output += `<div class="test-result test-pass">✓ Library contains ${signCount} signs</div>`;
+                passCount++;
+            } else {
+                output += '<div class="test-result test-fail">✗ Library is empty</div>';
+                failCount++;
+            }
+            
+            // Test 3: Test common words
+            const testWords = ['hello', 'thank', 'yes', 'no', 'help'];
+            testWords.forEach(word => {
+                if (hasASLSign(word)) {
+                    output += `<div class="test-result test-pass">✓ Word "${word}" found in library</div>`;
+                    passCount++;
+                } else {
+                    output += `<div class="test-result test-fail">✗ Word "${word}" not found in library</div>`;
+                    failCount++;
+                }
+            });
+            
+            // Test 4: getASLSign function
+            const helloSign = getASLSign('hello');
+            if (helloSign && helloSign.video && helloSign.description) {
+                output += '<div class="test-result test-pass">✓ getASLSign() returns proper structure</div>';
+                passCount++;
+            } else {
+                output += '<div class="test-result test-fail">✗ getASLSign() structure invalid</div>';
+                failCount++;
+            }
+            
+            // Test 5: Case insensitive lookup
+            if (hasASLSign('HELLO') && hasASLSign('HeLLo')) {
+                output += '<div class="test-result test-pass">✓ Case-insensitive lookup working</div>';
+                passCount++;
+            } else {
+                output += '<div class="test-result test-fail">✗ Case-insensitive lookup failed</div>';
+                failCount++;
+            }
+            
+            output += `<div class="test-result test-info"><strong>Summary:</strong> ${passCount} passed, ${failCount} failed</div>`;
+            results.innerHTML = output;
+        }
+        
+        function showAvailableWords() {
+            const wordList = document.getElementById('wordList');
+            const signCount = document.getElementById('signCount');
+            const words = getAvailableWords();
+            
+            signCount.textContent = words.length;
+            
+            let html = '';
+            words.forEach(word => {
+                html += `<div class="word-item">${word}</div>`;
+            });
+            
+            wordList.innerHTML = html;
+        }
+        
+        function testWordLookup() {
+            const input = document.getElementById('testWord');
+            const result = document.getElementById('lookupResult');
+            const word = input.value.trim();
+            
+            if (!word) {
+                result.innerHTML = '<div class="test-result test-fail">Please enter a word</div>';
+                return;
+            }
+            
+            if (hasASLSign(word)) {
+                const signInfo = getASLSign(word);
+                result.innerHTML = `
+                    <div class="test-result test-pass">
+                        ✓ Word "${word}" found!<br>
+                        <strong>Description:</strong> ${signInfo.description}<br>
+                        <strong>Video URL:</strong> <a href="${signInfo.video}" target="_blank">${signInfo.video}</a>
+                    </div>
+                `;
+            } else {
+                result.innerHTML = `
+                    <div class="test-result test-fail">
+                        ✗ Word "${word}" not found in library<br>
+                        <em>Note: The library currently contains ${getSignCount()} words. Consider adding this word!</em>
+                    </div>
+                `;
+            }
+        }
+        
+        function testBrowserSupport() {
+            const results = document.getElementById('browserResults');
+            let output = '';
+            
+            // Test Speech Recognition
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                output += '<div class="test-result test-pass">✓ Speech Recognition API supported</div>';
+            } else {
+                output += '<div class="test-result test-fail">✗ Speech Recognition API not supported</div>';
+            }
+            
+            // Test HTML5 Video
+            const video = document.createElement('video');
+            if (video.canPlayType) {
+                output += '<div class="test-result test-pass">✓ HTML5 Video supported</div>';
+                
+                // Test MP4 support
+                if (video.canPlayType('video/mp4')) {
+                    output += '<div class="test-result test-pass">✓ MP4 video format supported</div>';
+                } else {
+                    output += '<div class="test-result test-fail">✗ MP4 video format not supported</div>';
+                }
+            } else {
+                output += '<div class="test-result test-fail">✗ HTML5 Video not supported</div>';
+            }
+            
+            // Browser info
+            output += `<div class="test-result test-info">
+                <strong>Browser:</strong> ${navigator.userAgent}<br>
+                <strong>Language:</strong> ${navigator.language}<br>
+                <strong>Online:</strong> ${navigator.onLine}
+            </div>`;
+            
+            results.innerHTML = output;
+        }
+        
+        function testVideoURLs() {
+            const results = document.getElementById('videoResults');
+            results.innerHTML = '<div class="test-result test-info">Testing sample video URLs...</div>';
+            
+            // Test a few video URLs
+            const testWords = ['hello', 'thank', 'yes', 'help', 'good'];
+            const promises = [];
+            
+            testWords.forEach(word => {
+                if (hasASLSign(word)) {
+                    const sign = getASLSign(word);
+                    
+                    // Try to load the video thumbnail
+                    const promise = fetch(sign.video, { method: 'HEAD' })
+                        .then(response => {
+                            if (response.ok) {
+                                return { word, status: 'pass', message: `✓ Video accessible: "${word}"` };
+                            } else {
+                                return { word, status: 'fail', message: `✗ Video not accessible: "${word}" (${response.status})` };
+                            }
+                        })
+                        .catch(error => {
+                            return { word, status: 'info', message: `⚠ Could not verify: "${word}" (CORS or network issue)` };
+                        });
+                    
+                    promises.push(promise);
+                }
+            });
+            
+            // Wait for all tests to complete
+            Promise.all(promises).then(testResults => {
+                let output = '';
+                testResults.forEach(result => {
+                    output += `<div class="test-result test-${result.status}">${result.message}</div>`;
+                });
+                results.innerHTML = output;
+            });
+        }
+        
+        // Run basic tests on load
+        window.addEventListener('DOMContentLoaded', () => {
+            showAvailableWords();
+            console.log('Test suite loaded successfully');
+        });
+    </script>
+</body>
+</html>

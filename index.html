@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LingoBridge - Speech to Sign Language Translation</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌉 LingoBridge</h1>
+            <p class="subtitle">Real-time Speech to ASL Translation for Inclusive Learning</p>
+        </header>
+
+        <main>
+            <section class="controls">
+                <button id="startBtn" class="btn btn-primary">
+                    <span class="icon">🎤</span> Start Listening
+                </button>
+                <button id="stopBtn" class="btn btn-secondary" disabled>
+                    <span class="icon">⏹️</span> Stop
+                </button>
+                <button id="clearBtn" class="btn btn-tertiary">
+                    <span class="icon">🗑️</span> Clear
+                </button>
+                <div id="status" class="status">Ready to start</div>
+            </section>
+
+            <div class="content-grid">
+                <section class="transcript-section">
+                    <h2>Live Transcript</h2>
+                    <div id="transcript" class="transcript-box">
+                        <p class="placeholder">Spoken words will appear here...</p>
+                    </div>
+                </section>
+
+                <section class="video-section">
+                    <h2>ASL Translation</h2>
+                    <div id="videoContainer" class="video-container">
+                        <div class="video-placeholder">
+                            <span class="icon-large">👋</span>
+                            <p>ASL signs will be displayed here</p>
+                        </div>
+                        <video id="aslVideo" class="asl-video" controls></video>
+                    </div>
+                    <div id="currentWord" class="current-word"></div>
+                </section>
+            </div>
+
+            <section class="info-section">
+                <h3>How to Use</h3>
+                <ol>
+                    <li>Click "Start Listening" to begin speech recognition</li>
+                    <li>Speak clearly into your microphone</li>
+                    <li>Watch as your words are converted to text and ASL signs</li>
+                    <li>Click "Stop" when finished</li>
+                </ol>
+                <p class="note">
+                    <strong>Note:</strong> This system works best with clear speech and common words. 
+                    Make sure your browser has microphone permissions enabled.
+                </p>
+            </section>
+        </main>
+
+        <footer>
+            <p>LingoBridge - Supporting inclusive education through technology</p>
+        </footer>
+    </div>
+
+    <script src="asl-library.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
