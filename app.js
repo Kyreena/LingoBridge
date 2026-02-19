@@ -325,3 +325,400 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log(`LingoBridge initialized with ${getSignCount()} ASL signs`);
     console.log('Available words:', getAvailableWords().join(', '));
 });
+
+/**
+ * Enhanced Features Extension
+ */
+
+// Statistics tracking
+LingoBridge.prototype.wordCount = 0;
+LingoBridge.prototype.signCount = 0;
+
+// Initialize enhanced features
+LingoBridge.prototype.initializeEnhancedFeatures = function() {
+    // Get new DOM elements
+    this.demoBtn = document.getElementById('demoBtn');
+    this.downloadBtn = document.getElementById('downloadBtn');
+    this.darkModeToggle = document.getElementById('darkModeToggle');
+    this.helpBtn = document.getElementById('helpBtn');
+    this.settingsBtn = document.getElementById('settingsBtn');
+    this.fullscreenBtn = document.getElementById('fullscreenBtn');
+    this.playbackSpeed = document.getElementById('playbackSpeed');
+    
+    // Stats elements
+    this.wordCountDisplay = document.getElementById('wordCount');
+    this.signCountDisplay = document.getElementById('signCount');
+    this.totalSignsDisplay = document.getElementById('totalSigns');
+    
+    // Modals
+    this.helpModal = document.getElementById('helpModal');
+    this.settingsModal = document.getElementById('settingsModal');
+    
+    // Setup enhanced event listeners
+    this.setupEnhancedListeners();
+    
+    // Load settings from localStorage
+    this.loadSettings();
+    
+    // Update total signs count
+    if (this.totalSignsDisplay) {
+        this.totalSignsDisplay.textContent = getSignCount();
+    }
+};
+
+// Setup enhanced event listeners
+LingoBridge.prototype.setupEnhancedListeners = function() {
+    // Demo mode
+    if (this.demoBtn) {
+        this.demoBtn.addEventListener('click', () => this.startDemo());
+    }
+    
+    // Download transcript
+    if (this.downloadBtn) {
+        this.downloadBtn.addEventListener('click', () => this.downloadTranscript());
+    }
+    
+    // Dark mode toggle
+    if (this.darkModeToggle) {
+        this.darkModeToggle.addEventListener('click', () => this.toggleDarkMode());
+    }
+    
+    // Help modal
+    if (this.helpBtn) {
+        this.helpBtn.addEventListener('click', () => this.showModal('help'));
+    }
+    
+    // Settings modal
+    if (this.settingsBtn) {
+        this.settingsBtn.addEventListener('click', () => this.showModal('settings'));
+    }
+    
+    // Fullscreen
+    if (this.fullscreenBtn) {
+        this.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+    }
+    
+    // Playback speed
+    if (this.playbackSpeed) {
+        this.playbackSpeed.addEventListener('change', (e) => {
+            this.aslVideo.playbackRate = parseFloat(e.target.value);
+        });
+    }
+    
+    // Modal close buttons
+    document.querySelectorAll('.modal-close').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.target.closest('.modal').hidden = true;
+        });
+    });
+    
+    // Close modals on outside click
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.hidden = true;
+            }
+        });
+    });
+    
+    // Settings actions
+    const saveSettingsBtn = document.getElementById('saveSettings');
+    const resetSettingsBtn = document.getElementById('resetSettings');
+    
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener('click', () => this.saveSettings());
+    }
+    
+    if (resetSettingsBtn) {
+        resetSettingsBtn.addEventListener('click', () => this.resetSettings());
+    }
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
+};
+
+// Keyboard shortcuts handler
+LingoBridge.prototype.handleKeyboardShortcuts = function(e) {
+    // Don't trigger if user is typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+        return;
+    }
+    
+    switch(e.key) {
+        case ' ': // Space - Start/Stop
+            e.preventDefault();
+            if (this.isListening) {
+                this.stopListening();
+            } else {
+                this.startListening();
+            }
+            break;
+        case 'Escape': // Esc - Clear
+            this.clearTranscript();
+            break;
+        case 'd':
+        case 'D':
+            this.startDemo();
+            break;
+        case 's':
+        case 'S':
+            this.downloadTranscript();
+            break;
+        case '?':
+            this.showModal('help');
+            break;
+    }
+};
+
+// Demo mode - simulates speech recognition
+LingoBridge.prototype.startDemo = function() {
+    const demoText = "hello teacher thank you for helping me learn today i understand the lesson very well good class";
+    const words = demoText.split(' ');
+    
+    this.updateStatus('Demo mode: Playing sample transcript');
+    this.demoBtn.disabled = true;
+    this.startBtn.disabled = true;
+    
+    let index = 0;
+    const demoInterval = setInterval(() => {
+        if (index >= words.length) {
+            clearInterval(demoInterval);
+            this.updateStatus('Demo complete');
+            this.demoBtn.disabled = false;
+            this.startBtn.disabled = false;
+            return;
+        }
+        
+        const word = words[index];
+        this.transcript.push(word);
+        this.wordCount++;
+        this.updateStats();
+        
+        if (hasASLSign(word)) {
+            const signInfo = getASLSign(word);
+            this.videoQueue.push({
+                word: word,
+                videoUrl: signInfo.video,
+                description: signInfo.description
+            });
+        }
+        
+        this.updateTranscriptDisplay();
+        
+        if (!this.isPlayingVideo && this.videoQueue.length > 0) {
+            this.playNextVideo();
+        }
+        
+        index++;
+    }, 800); // Add word every 800ms
+};
+
+// Download transcript as text file
+LingoBridge.prototype.downloadTranscript = function() {
+    if (this.transcript.length === 0) {
+        alert('No transcript to download. Please speak some words first.');
+        return;
+    }
+    
+    const text = this.transcript.join(' ');
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const filename = `lingobridge-transcript-${timestamp}.txt`;
+    
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    this.updateStatus(`Downloaded: ${filename}`);
+};
+
+// Toggle dark mode
+LingoBridge.prototype.toggleDarkMode = function() {
+    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.contains('dark-mode');
+    
+    // Update button icon
+    if (this.darkModeToggle) {
+        this.darkModeToggle.textContent = isDark ? '☀️' : '🌙';
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('darkMode', isDark);
+};
+
+// Show modal
+LingoBridge.prototype.showModal = function(type) {
+    if (type === 'help' && this.helpModal) {
+        this.helpModal.hidden = false;
+    } else if (type === 'settings' && this.settingsModal) {
+        this.settingsModal.hidden = false;
+    }
+};
+
+// Toggle fullscreen for video
+LingoBridge.prototype.toggleFullscreen = function() {
+    if (!document.fullscreenElement) {
+        this.videoContainer.requestFullscreen().catch(err => {
+            console.error('Fullscreen error:', err);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+};
+
+// Update statistics display
+LingoBridge.prototype.updateStats = function() {
+    if (this.wordCountDisplay) {
+        this.wordCountDisplay.textContent = this.wordCount;
+    }
+    if (this.signCountDisplay) {
+        this.signCountDisplay.textContent = this.signCount;
+    }
+};
+
+// Enhanced processFinalTranscript with stats
+const originalProcessFinalTranscript = LingoBridge.prototype.processFinalTranscript;
+LingoBridge.prototype.processFinalTranscript = function(text) {
+    const wordsBefore = this.transcript.length;
+    originalProcessFinalTranscript.call(this, text);
+    const wordsAfter = this.transcript.length;
+    
+    this.wordCount += (wordsAfter - wordsBefore);
+    this.updateStats();
+};
+
+// Enhanced playNextVideo with stats
+const originalPlayNextVideo = LingoBridge.prototype.playNextVideo;
+LingoBridge.prototype.playNextVideo = function() {
+    const indexBefore = this.currentVideoIndex;
+    originalPlayNextVideo.call(this);
+    const indexAfter = this.currentVideoIndex;
+    
+    if (indexAfter > indexBefore) {
+        this.signCount++;
+        this.updateStats();
+    }
+};
+
+// Enhanced clearTranscript to reset stats
+const originalClearTranscript = LingoBridge.prototype.clearTranscript;
+LingoBridge.prototype.clearTranscript = function() {
+    originalClearTranscript.call(this);
+    this.wordCount = 0;
+    this.signCount = 0;
+    this.updateStats();
+};
+
+// Load settings from localStorage
+LingoBridge.prototype.loadSettings = function() {
+    // Dark mode
+    const darkMode = localStorage.getItem('darkMode') === 'true';
+    if (darkMode) {
+        document.body.classList.add('dark-mode');
+        if (this.darkModeToggle) {
+            this.darkModeToggle.textContent = '☀️';
+        }
+    }
+    
+    // Text size
+    const textSize = localStorage.getItem('textSize') || 'medium';
+    const textSizeSelect = document.getElementById('textSize');
+    if (textSizeSelect) {
+        textSizeSelect.value = textSize;
+        this.applyTextSize(textSize);
+    }
+    
+    // Auto-play
+    const autoPlay = localStorage.getItem('autoPlay') !== 'false';
+    const autoPlayCheckbox = document.getElementById('autoPlay');
+    if (autoPlayCheckbox) {
+        autoPlayCheckbox.checked = autoPlay;
+    }
+    
+    // Highlight words
+    const highlightWords = localStorage.getItem('highlightWords') !== 'false';
+    const highlightWordsCheckbox = document.getElementById('highlightWords');
+    if (highlightWordsCheckbox) {
+        highlightWordsCheckbox.checked = highlightWords;
+    }
+    
+    // Show stats
+    const showStats = localStorage.getItem('showStats') !== 'false';
+    const showStatsCheckbox = document.getElementById('showStats');
+    if (showStatsCheckbox) {
+        showStatsCheckbox.checked = showStats;
+        this.toggleStats(showStats);
+    }
+};
+
+// Save settings to localStorage
+LingoBridge.prototype.saveSettings = function() {
+    const textSize = document.getElementById('textSize').value;
+    const autoPlay = document.getElementById('autoPlay').checked;
+    const highlightWords = document.getElementById('highlightWords').checked;
+    const showStats = document.getElementById('showStats').checked;
+    
+    localStorage.setItem('textSize', textSize);
+    localStorage.setItem('autoPlay', autoPlay);
+    localStorage.setItem('highlightWords', highlightWords);
+    localStorage.setItem('showStats', showStats);
+    
+    // Apply settings
+    this.applyTextSize(textSize);
+    this.toggleStats(showStats);
+    
+    // Close modal
+    this.settingsModal.hidden = true;
+    this.updateStatus('Settings saved');
+};
+
+// Reset settings to defaults
+LingoBridge.prototype.resetSettings = function() {
+    localStorage.clear();
+    document.getElementById('textSize').value = 'medium';
+    document.getElementById('autoPlay').checked = true;
+    document.getElementById('highlightWords').checked = true;
+    document.getElementById('showStats').checked = true;
+    
+    this.applyTextSize('medium');
+    this.toggleStats(true);
+    
+    this.updateStatus('Settings reset to defaults');
+};
+
+// Apply text size
+LingoBridge.prototype.applyTextSize = function(size) {
+    const sizeMap = {
+        'small': '0.9em',
+        'medium': '1.1em',
+        'large': '1.3em',
+        'x-large': '1.5em'
+    };
+    
+    if (this.transcriptBox) {
+        this.transcriptBox.style.fontSize = sizeMap[size] || '1.1em';
+    }
+};
+
+// Toggle stats bar visibility
+LingoBridge.prototype.toggleStats = function(show) {
+    const statsBar = document.querySelector('.stats-bar');
+    if (statsBar) {
+        statsBar.style.display = show ? 'flex' : 'none';
+    }
+};
+
+// Update the DOMContentLoaded event
+document.addEventListener('DOMContentLoaded', () => {
+    const app = new LingoBridge();
+    
+    // Initialize enhanced features
+    app.initializeEnhancedFeatures();
+    
+    // Log library info
+    console.log(`LingoBridge v1.0.0 initialized with ${getSignCount()} ASL signs`);
+    console.log('Enhanced features enabled: Dark mode, Demo mode, Download, Settings');
+});
