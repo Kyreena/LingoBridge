@@ -5,6 +5,48 @@
     <title>LingoBridge – Speech to ASL</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+        <title>LingoBridge - Real-time Speech to ASL Translation for Inclusive Education</title>
+    <meta name="description" content="Web-based real-time speech-to-sign language translation system for inclusive classroom communication. Converts spoken English to ASL video signs instantly.">
+    <meta name="keywords" content="ASL, sign language, speech recognition, inclusive education, accessibility, deaf education, real-time translation">
+    <meta name="author" content="LingoBridge">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://kyreena.github.io/LingoBridge/">
+    <meta property="og:title" content="LingoBridge - Speech to ASL Translation">
+    <meta property="og:description" content="Real-time speech-to-sign language translation system for inclusive classroom communication">
+    <meta property="og:image" content="https://kyreena.github.io/LingoBridge/favicon.svg">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://kyreena.github.io/LingoBridge/">
+    <meta property="twitter:title" content="LingoBridge - Speech to ASL Translation">
+    <meta property="twitter:description" content="Real-time speech-to-sign language translation system for inclusive classroom communication">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "LingoBridge",
+        "description": "Real-time speech-to-sign language translation system for inclusive education",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Web Browser",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "5",
+            "ratingCount": "1"
+        }
+    }
+    </script>
     <!-- CSS -->
     <link rel="stylesheet" href="style.css" />
 </head>
@@ -13,74 +55,223 @@
     <!-- ================= HEADER ================= -->
     <header class="header">
         <h1>LingoBridge</h1>
-        <p>Real-time Speech to ASL Interpretation</p>
+        <p>Real-time Speech to ASL Interpretation for Inclusive Learning</p>
+        <div class="header-actions">
+                <button id="darkModeToggle" class="btn-icon" aria-label="Toggle dark mode" title="Toggle dark mode">
+                    🌙
+                </button>
+                <button id="helpBtn" class="btn-icon" aria-label="Show help" title="Show help">
+                    ❓
+                </button>
+                <button id="settingsBtn" class="btn-icon" aria-label="Open settings" title="Open settings">
+                    ⚙️
+                </button>
+            </div>
     </header>
 
 
     <!-- ================= APP CONTAINER ================= -->
-    <main class="app">
-
-        <!-- ======= MAIN CONTENT AREA ======= -->
-        <section class="main-content">
-
-            <!-- TRANSCRIPT PANEL -->
-            <section class="card transcript-panel">
-                <h2>Live Transcript</h2>
-
-                <!-- This will scroll like lyrics -->
-                <div id="transcript" class="transcript">
-                    <!-- Lines will be appended here by JS -->
-                    <p class="placeholder">Waiting for speech...</p>
-                </div>
-            </section>
-
-            <!-- ASL VIDEO PANEL -->
-            <section class="card video-panel">
-                <h2>ASL Interpretation</h2>
-
-                <!-- NEW: Status indicator -->
-                <div id="video-status" class="video-status">
-                    <span class="status-dot"></span>
-                    <span id="status-text">Ready</span>
-                </div>
-
-                <div class="video-wrapper">
-                    <video
-                        id="aslVideo"
-                        controls
-                        autoplay
-                        muted
-                        playsinline
-                    >
-                        <source src="" type="video/mp4" />
-                        Your browser does not support video playback.
-                    </video>
-                </div>
-            </section>
-
-        </section>
-
-
-        <!-- ======= MEDIA CONTROLS ======= -->
+    <main>
+      <main role="main">
         <section class="controls">
+                <button id="startBtn" class="btn btn-primary">
+                    <span class="icon">🎤</span> Start Listening
 
-            <button id="start-btn" class="control-btn">
-                ▶ Start
-            </button>
+                    <section class="controls" role="toolbar" aria-label="Main controls">
+                <button id="startBtn" class="btn btn-primary" aria-label="Start listening to speech">
+                    <span class="icon" aria-hidden="true">🎤</span> Start Listening
+                </button>
+                <button id="stopBtn" class="btn btn-secondary" disabled aria-label="Stop listening">
+                    <span class="icon" aria-hidden="true">⏹️</span> Stop
+                </button>
+                <button id="demoBtn" class="btn btn-demo" aria-label="Start demo mode">
+                    <span class="icon" aria-hidden="true">🎬</span> Demo
+                </button>
+                <button id="stopBtn" class="btn btn-secondary" disabled>
+                    <span class="icon">⏹️</span> Stop
+                <button id="clearBtn" class="btn btn-tertiary" aria-label="Clear transcript">
+                    <span class="icon" aria-hidden="true">🗑️</span> Clear
+                </button>
+                <button id="clearBtn" class="btn btn-tertiary">
+                    <span class="icon">🗑️</span> Clear
+                <button id="stopBtn" class="btn btn-secondary" disabled>
+                    <span class="icon">⏹️</span> Stop
+                </button>
+                <button id="clearBtn" class="btn btn-tertiary">
+                    <span class="icon">🗑️</span> Clear
+                <button id="downloadBtn" class="btn btn-download" aria-label="Download transcript">
+                    <span class="icon" aria-hidden="true">⬇️</span> Download
+                </button>
+                <div id="status" class="status">Ready to start</div>
+                <div id="status" class="status" role="status" aria-live="polite">Ready to start</div>
+            </section>
+            
+            <section class="stats-bar" role="region" aria-label="Statistics">
+                <div class="stat-item">
+                    <span class="stat-label">Words Recognized:</span>
+                    <span id="wordCount" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Signs Played:</span>
+                    <span id="signCount" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Available Signs:</span>
+                    <span id="totalSigns" class="stat-value">56</span>
+                </div>
+            </section>
+            <div class="content-grid">
+                <section class="transcript-section">
+                <section class="transcript-section" role="region" aria-label="Live transcript">
+                    <h2>Live Transcript</h2>
+                    <div id="transcript" class="transcript-box">
+                    <div id="transcript" class="transcript-box" role="log" aria-live="polite">
+                        <p class="placeholder">Spoken words will appear here...</p>
+                    </div>
+                </section>
 
-            <button id="pause-btn" class="control-btn">
-                ⏸ Pause
-            </button>
-
-            <button id="stop-btn" class="control-btn">
-                ⏹ Stop
-            </button>
-
-        </section>
-
+                <section class="video-section">
+                <section class="video-section" role="region" aria-label="ASL video translation">
+                    <h2>ASL Translation</h2>
+                    <div class="video-controls">
+                        <button id="fullscreenBtn" class="btn-icon" aria-label="Toggle fullscreen" title="Fullscreen">
+                            <span aria-hidden="true">⛶</span>
+                        </button>
+                        <label for="playbackSpeed" class="sr-only">Playback speed</label>
+                        <select id="playbackSpeed" class="speed-control" aria-label="Video playback speed">
+                            <option value="0.5">0.5x</option>
+                            <option value="0.75">0.75x</option>
+                            <option value="1" selected>1x</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                        </select>
+                    </div>
+                    <div id="videoContainer" class="video-container">
+                        <div class="video-placeholder">
+                            <span class="icon-large">👋</span>
+                    <h2>ASL Translation</h2>
+                    <div id="videoContainer" class="video-container">
+                        <div class="video-placeholder">
+                            <span class="icon-large">👋</span>
+                            <span class="icon-large" aria-hidden="true">👋</span>
+                            <p>ASL signs will be displayed here</p>
+                        </div>
+                        <video id="aslVideo" class="asl-video" controls></video>
+                        <video id="aslVideo" class="asl-video" controls aria-label="ASL sign video"></video>
+                    </div>
+                    <div id="currentWord" class="current-word"></div>
+                </section>
+                        </div>
+                        <video id="aslVideo" class="asl-video" controls></video>
+                    </div>
+                    <div id="currentWord" class="current-word"></div>
+                    <div id="currentWord" class="current-word" role="status" aria-live="polite"></div>
+                </section>
+            </div>     
+      </main>  
     </main>
-
-
+            <footer>
+        <footer role="contentinfo">
+            <p>LingoBridge - Supporting inclusive education through technology</p>
+            <p class="footer-links">
+                <a href="https://github.com/Kyreena/LingoBridge" target="_blank" rel="noopener">GitHub</a> |
+                <a href="LICENSE" target="_blank">License</a> |
+                <a href="CONTRIBUTING.md" target="_blank">Contributing</a> |
+                <a href="CHANGELOG.md" target="_blank">Changelog</a>
+            </p>
+            <p class="keyboard-shortcuts">
+                <small>Keyboard shortcuts: <kbd>Space</kbd> Start/Stop | <kbd>Esc</kbd> Clear | <kbd>D</kbd> Demo | <kbd>?</kbd> Help</small>
+            </p>
+        </footer>
+    </div>
+        <footer>
+            <p>LingoBridge - Supporting inclusive education through technology</p>
+        </footer>
+    </div>
+    <!-- Help Modal -->
+    <div id="helpModal" class="modal" role="dialog" aria-labelledby="helpModalTitle" aria-modal="true" hidden>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="helpModalTitle">How to Use LingoBridge</h2>
+                <button class="modal-close" aria-label="Close help">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3>Getting Started</h3>
+                <ol>
+                    <li>Click <strong>"Start Listening"</strong> or press <kbd>Space</kbd></li>
+                    <li>Allow microphone access when prompted</li>
+                    <li>Speak clearly into your microphone</li>
+                    <li>Watch ASL signs appear automatically</li>
+                </ol>
+                
+                <h3>Features</h3>
+                <ul>
+                    <li><strong>Demo Mode:</strong> Test the system without a microphone</li>
+                    <li><strong>Download:</strong> Save your transcript as a text file</li>
+                    <li><strong>Dark Mode:</strong> Toggle for comfortable viewing</li>
+                    <li><strong>Playback Speed:</strong> Adjust video speed (0.5x - 1.5x)</li>
+                    <li><strong>Fullscreen:</strong> Expand video for better visibility</li>
+                </ul>
+                
+                <h3>Keyboard Shortcuts</h3>
+                <ul>
+                    <li><kbd>Space</kbd> - Start/Stop listening</li>
+                    <li><kbd>Esc</kbd> - Clear transcript</li>
+                    <li><kbd>D</kbd> - Start demo mode</li>
+                    <li><kbd>S</kbd> - Download transcript</li>
+                    <li><kbd>?</kbd> - Show this help</li>
+                </ul>
+                
+                <h3>Tips for Best Results</h3>
+                <ul>
+                    <li>Speak clearly and at a moderate pace</li>
+                    <li>Use common words (56 signs available)</li>
+                    <li>Ensure good microphone quality</li>
+                    <li>Minimize background noise</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal" role="dialog" aria-labelledby="settingsModalTitle" aria-modal="true" hidden>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="settingsModalTitle">Settings</h2>
+                <button class="modal-close" aria-label="Close settings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label for="textSize">Transcript Text Size</label>
+                    <select id="textSize">
+                        <option value="small">Small</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="large">Large</option>
+                        <option value="x-large">Extra Large</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group">
+                    <label for="autoPlay">Auto-play ASL Videos</label>
+                    <input type="checkbox" id="autoPlay" checked>
+                </div>
+                
+                <div class="setting-group">
+                    <label for="highlightWords">Highlight Words with Signs</label>
+                    <input type="checkbox" id="highlightWords" checked>
+                </div>
+                
+                <div class="setting-group">
+                    <label for="showStats">Show Statistics Bar</label>
+                    <input type="checkbox" id="showStats" checked>
+                </div>
+                
+                <div class="setting-actions">
+                    <button id="saveSettings" class="btn btn-primary">Save Settings</button>
+                    <button id="resetSettings" class="btn btn-secondary">Reset to Defaults</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- ================= JS ================= -->
     <script src="script.js"></script>
 
