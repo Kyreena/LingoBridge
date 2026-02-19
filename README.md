@@ -215,6 +215,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📧 Support
 
+### Common Issues?
+
+- **Git checkout errors?** See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- **Quick fix needed?** See [QUICK_FIX.md](QUICK_FIX.md)
+- **Worried about data loss?** See [DID_I_DELETE_MY_WORK.md](DID_I_DELETE_MY_WORK.md)
+- **Pull instructions?** See [PULL_GUIDE.md](PULL_GUIDE.md)
+
+### Application Issues
+
 For questions or issues:
 1. Check the browser console for error messages
 2. Ensure microphone permissions are granted
