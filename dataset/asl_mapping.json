@@ -112,5 +112,7 @@
   "afternoon": { "video_id": "65031", "file": "65031.mp4" },
   "evening": { "video_id": "19743", "file": "19743.mp4" },
   "day": { "video_id": "69291", "file": "69291.mp4" },
-  "your": { "video_id": "64428", "file": "64428.mp4" }
+  "your": { "video_id": "64428", "file": "64428.mp4" },
+  "will": { "video_id": "69536", "file": "69536.mp4" },
+  "for": { "video_id": "23000", "file": "23000.mp4" }
 }
