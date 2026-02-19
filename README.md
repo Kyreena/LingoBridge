@@ -150,7 +150,7 @@ this.recognition.lang = 'en-US';       // Language
 
 - **Recognition Latency**: < 1 second for speech-to-text
 - **Video Loading**: Depends on internet connection
-- **Supported Sign Library**: 70+ words (expandable)
+- **Supported Sign Library**: 56 words (expandable)
 - **Browser Resource Usage**: Minimal
 
 ## 🔒 Privacy & Security
@@ -159,10 +159,43 @@ this.recognition.lang = 'en-US';       // Language
 - No audio data is stored or transmitted to external servers
 - Video content is streamed from external CDN (signingsavvy.com)
 - No user data collection or tracking
+- Settings stored locally in browser (localStorage)
+
+## 🚀 Deployment
+
+### GitHub Pages (Automatic)
+
+This repository includes a GitHub Actions workflow for automatic deployment to GitHub Pages:
+
+1. Push to the `main` branch
+2. GitHub Actions automatically deploys to GitHub Pages
+3. Access at: `https://yourusername.github.io/LingoBridge/`
+
+### Manual Deployment
+
+#### Local Server
+```bash
+# Using Python
+python3 -m http.server 8080
+
+# Using Node.js http-server
+npx http-server -p 8080
+
+# Using PHP
+php -S localhost:8080
+```
+
+#### Static Hosting Services
+- **Netlify**: Drag and drop the repository folder
+- **Vercel**: Connect GitHub repository
+- **GitHub Pages**: Enable in repository settings
+- **Cloudflare Pages**: Connect GitHub repository
 
 ## 🤝 Contributing
 
-Contributions are welcome! Areas for improvement:
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+Areas for improvement:
 
 1. **Expand ASL Library**: Add more signs and phrases
 2. **Multi-language Support**: Add support for other sign languages
@@ -172,7 +205,7 @@ Contributions are welcome! Areas for improvement:
 
 ## 📝 License
 
-This project is open source and available for educational purposes.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
@@ -187,6 +220,7 @@ For questions or issues:
 2. Ensure microphone permissions are granted
 3. Verify internet connection for video playback
 4. Try using Google Chrome for best compatibility
+5. Open an issue on [GitHub](https://github.com/Kyreena/LingoBridge/issues)
 
 ## 🔮 Future Enhancements
 
@@ -197,7 +231,15 @@ For questions or issues:
 - [ ] Integration with video conferencing platforms
 - [ ] Mobile app versions
 - [ ] Support for other sign languages (BSL, LSF, etc.)
+- [ ] Real-time collaboration features
+- [ ] Assessment and progress tracking tools
+
+## 📈 Version History
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
 ---
 
-**LingoBridge** - Breaking communication barriers through technology 🌉
+**LingoBridge v1.0.0** - Breaking communication barriers through technology 🌉
+
+Made with ❤️ for inclusive education
