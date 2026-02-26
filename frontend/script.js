@@ -1,237 +1,522 @@
-const transcriptEl = document.getElementById("transcript");
-const videoEl = document.getElementById("aslVideo");
+// ==========================================
+// LingoBridge - Speech to ASL Translation
+// ==========================================
 
-const startBtn = document.getElementById("start-btn");
-const pauseBtn = document.getElementById("pause-btn");
-const stopBtn = document.getElementById("stop-btn");
+// --------------------------
+// CONFIGURATION
+// --------------------------
+const API_BASE_URL = 'http://localhost:5000';
+const DEMO_TEXT = "Hello my name is John. I love learning sign language. Thank you for watching.";
 
-/* =========================
-   ASL FLOW STATE
-========================= */
-let aslQueue = [];
-let isPlayingASL = false;
-let currentWord = null;  // NEW: Track which word is being signed
+// --------------------------
+// DOM ELEMENTS
+// --------------------------
+// Buttons
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const demoBtn = document.getElementById('demoBtn');
+const clearBtn = document.getElementById('clearBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const darkModeToggle = document.getElementById('darkModeToggle');
+const helpBtn = document.getElementById('helpBtn');
+const settingsBtn = document.getElementById('settingsBtn');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const saveSettingsBtn = document.getElementById('saveSettings');
+const resetSettingsBtn = document.getElementById('resetSettings');
 
-const STOP_WORDS = [
-    "the", "is", "a", "an", "and", "or", "but"  // Added more stop words
-];
+// Display elements
+const status = document.getElementById('status');
+const transcript = document.getElementById('transcript');
+const videoContainer = document.getElementById('videoContainer');
+const aslVideo = document.getElementById('aslVideo');
+const currentWord = document.getElementById('currentWord');
+const playbackSpeed = document.getElementById('playbackSpeed');
 
-/* =========================
-   SPEECH STATE
-========================= */
-let recognition;
+// Stats
+const wordCount = document.getElementById('wordCount');
+const signCount = document.getElementById('signCount');
+const totalSigns = document.getElementById('totalSigns');
+
+// Modals
+const helpModal = document.getElementById('helpModal');
+const settingsModal = document.getElementById('settingsModal');
+
+// Settings inputs
+const textSize = document.getElementById('textSize');
+const autoPlay = document.getElementById('autoPlay');
+const highlightWords = document.getElementById('highlightWords');
+const showStats = document.getElementById('showStats');
+
+// --------------------------
+// STATE MANAGEMENT
+// --------------------------
+let recognition = null;
 let isListening = false;
-let isPaused = false;
+let wordsRecognized = 0;
+let signsPlayed = 0;
+let videoQueue = [];
+let isPlayingVideo = false;
+let availableSigns = new Set();
 
-/* =========================
-   INIT SPEECH RECOGNITION
-========================= */
-if ("webkitSpeechRecognition" in window) {
-    recognition = new webkitSpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.continuous = true;
-    recognition.interimResults = false;
-} else {
-    alert("Speech recognition not supported. Please use Chrome or Edge browser.");
-}
-
-/* =========================
-   START
-========================= */
-startBtn.addEventListener("click", () => {
-    if (!isListening) {
-        recognition.start();
-        isListening = true;
-        isPaused = false;
-        startBtn.textContent = "🎙 Listening...";
-        startBtn.style.background = "#e74c3c";  // Red while active
-    } else if (isPaused) {
-        // Resume if paused
-        recognition.start();
-        isPaused = false;
-        startBtn.textContent = "🎙 Listening...";
-        startBtn.style.background = "#e74c3c";
-    }
+// --------------------------
+// INITIALIZATION
+// --------------------------
+window.addEventListener('load', async () => {
+    initializeSpeechRecognition();
+    loadSettings();
+    await checkServerHealth();
+    setupEventListeners();
+    setupKeyboardShortcuts();
+    updateDarkModeIcon();
 });
 
-/* =========================
-   PAUSE
-========================= */
-pauseBtn.addEventListener("click", () => {
-    if (isListening && !isPaused) {
-        recognition.stop();
-        isPaused = true;
-        startBtn.textContent = "▶ Resume";
-        startBtn.style.background = "#52ab98";  // Back to green
-    }
-});
-
-/* =========================
-   STOP
-========================= */
-stopBtn.addEventListener("click", () => {
-    recognition.stop();
-    isListening = false;
-    isPaused = false;
-    aslQueue = [];
-    isPlayingASL = false;
-    currentWord = null;
-
-    startBtn.textContent = "▶ Start";
-    startBtn.style.background = "#52ab98";
-
-    videoEl.pause();
-    videoEl.src = "";
-    
-    // Clear transcript
-    transcriptEl.innerHTML = '<p class="placeholder">Waiting for speech...</p>';
-});
-
-/* =========================
-   SPEECH RESULT
-========================= */
-recognition.onresult = (event) => {
-    const result = event.results[event.results.length - 1];
-
-    if (!result.isFinal) return;
-
-    const transcript = result[0].transcript.toLowerCase().trim();
-
-    /* ---- Transcript display ---- */
-    const line = document.createElement("p");
-    line.textContent = transcript;
-    line.classList.add("transcript-line");
-    
-    // Remove placeholder if it exists
-    const placeholder = transcriptEl.querySelector(".placeholder");
-    if (placeholder) placeholder.remove();
-    
-    transcriptEl.appendChild(line);
-    transcriptEl.scrollTop = transcriptEl.scrollHeight;
-
-    /* ---- Extract meaningful words ---- */
-    const words = transcript.split(/\s+/);
-
-    words.forEach(word => {
-        // Clean the word
-        const cleanWord = word.replace(/[^\w]/g, "");
-        
-        if (
-            cleanWord.length < 3 ||
-            STOP_WORDS.includes(cleanWord) ||
-            aslQueue.includes(cleanWord)
-        ) return;
-
-        aslQueue.push(cleanWord);
-    });
-
-    /* ---- Start ASL flow ---- */
-    if (!isPlayingASL && aslQueue.length > 0) {
-        playNextASL();
-    }
-};
-
-/* =========================
-   ASL QUEUE PLAYER
-========================= */
-function playNextASL() {
-    if (aslQueue.length === 0) {
-        isPlayingASL = false;
-        currentWord = null;
+// --------------------------
+// SPEECH RECOGNITION SETUP
+// --------------------------
+function initializeSpeechRecognition() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        updateStatus('❌ Speech recognition not supported in this browser', 'error');
+        startBtn.disabled = true;
         return;
     }
 
-    isPlayingASL = true;
-    const word = aslQueue.shift();
-    currentWord = word;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
 
-    // Show loading state
-    showVideoStatus(`Loading sign for "${word}"...`, "loading");
+    recognition.onstart = () => {
+        isListening = true;
+        updateStatus('🎤 Listening...', 'listening');
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+    };
 
-    fetch(`http://localhost:5000/get_asl?word=${encodeURIComponent(word)}`)
-        .then(res => {
-            if (!res.ok) {
-                throw new Error(`Video not found for "${word}"`);
-            }
-            return res.json();
-        })
-        .then(data => {
-            if (data && data.video_url) {
-                showVideoStatus(`Signing: "${word}"`, "playing");
-                
-                videoEl.src = `http://localhost:5000${data.video_url}`;
-                videoEl.load();
-                videoEl.play().catch(err => {
-                    console.error("Video play error:", err);
-                    showVideoStatus(`Error playing "${word}"`, "error");
-                    playNextASL(); // Skip to next
-                });
+    recognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalTranscript += transcript + ' ';
             } else {
-                throw new Error("Invalid response");
+                interimTranscript += transcript;
             }
-        })
-        .catch(err => {
-            console.log(`⚠ ${err.message}`);
-            showVideoStatus(`No sign found for "${word}"`, "error");
-            
-            // Wait a moment then play next
-            setTimeout(() => playNextASL(), 1000);
-        });
+        }
+
+        if (finalTranscript) {
+            addToTranscript(finalTranscript);
+            processText(finalTranscript);
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'no-speech') {
+            updateStatus('⚠️ No speech detected. Please try again.', 'warning');
+        } else if (event.error === 'not-allowed') {
+            updateStatus('❌ Microphone access denied', 'error');
+        } else {
+            updateStatus(`❌ Error: ${event.error}`, 'error');
+        }
+    };
+
+    recognition.onend = () => {
+        if (isListening) {
+            // Restart if it was still supposed to be listening
+            try {
+                recognition.start();
+            } catch (e) {
+                stopListening();
+            }
+        } else {
+            stopListening();
+        }
+    };
 }
 
-/* =========================
-   VIDEO STATUS DISPLAY (NEW)
-========================= */
-function showVideoStatus(message, status) {
-    // You can create a status div in your HTML or just log it
-    console.log(`[${status.toUpperCase()}] ${message}`);
-    
-    // Optional: Add visual indicator in the video panel
-    // We'll add this to the HTML in the next step
-}
-
-/* =========================
-   CHAIN VIDEOS
-========================= */
-videoEl.onended = () => {
-    playNextASL();
-};
-
-/* =========================
-   ERROR HANDLING
-========================= */
-recognition.onerror = (event) => {
-    console.error("Speech recognition error:", event.error);
-    
-    if (event.error === "no-speech") {
-        console.log("No speech detected. Try speaking closer to the microphone.");
-    } else if (event.error === "network") {
-        alert("Network error. Please check your connection.");
+// --------------------------
+// CONTROL FUNCTIONS
+// --------------------------
+function startListening() {
+    if (!recognition) {
+        updateStatus('❌ Speech recognition not available', 'error');
+        return;
     }
-};
 
-/* =========================
-   SERVER CONNECTION CHECK (NEW)
-========================= */
-window.addEventListener("load", () => {
-    // Check if backend is running
-    fetch("http://localhost:5000/health")
-        .then(res => res.json())
-        .then(data => {
-            console.log("✅ Backend connected!");
-            console.log(`📊 Available signs: ${data.total_signs}`);
-        })
-        .catch(err => {
-            console.error("❌ Cannot connect to backend!");
-            alert("Backend server is not running. Please start the Flask server first.\n\nRun: python backend/app.py");
-        });
+    try {
+        recognition.start();
+        isListening = true;
+    } catch (error) {
+        console.error('Error starting recognition:', error);
+        updateStatus('❌ Failed to start listening', 'error');
+    }
+}
+
+function stopListening() {
+    if (recognition && isListening) {
+        isListening = false;
+        recognition.stop();
+        updateStatus('⏹️ Stopped listening', 'idle');
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+    }
+}
+
+function clearTranscript() {
+    transcript.innerHTML = '<p class="placeholder">Spoken words will appear here...</p>';
+    wordsRecognized = 0;
+    signsPlayed = 0;
+    updateStats();
+    updateStatus('🗑️ Transcript cleared', 'idle');
+}
+
+async function startDemo() {
+    updateStatus('🎬 Demo mode active...', 'demo');
+    stopListening();
+    
+    addToTranscript(DEMO_TEXT);
+    await processText(DEMO_TEXT);
+    
+    updateStatus('✅ Demo complete', 'success');
+}
+
+function downloadTranscript() {
+    const text = transcript.innerText.replace('Spoken words will appear here...', '').trim();
+    
+    if (!text) {
+        updateStatus('⚠️ Nothing to download', 'warning');
+        return;
+    }
+
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lingobridge-transcript-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    updateStatus('✅ Transcript downloaded', 'success');
+}
+
+// --------------------------
+// TRANSCRIPT MANAGEMENT
+// --------------------------
+function addToTranscript(text) {
+    // Remove placeholder if it exists
+    const placeholder = transcript.querySelector('.placeholder');
+    if (placeholder) {
+        placeholder.remove();
+    }
+
+    const words = text.trim().split(/\s+/);
+    wordsRecognized += words.length;
+    updateStats();
+
+    const p = document.createElement('p');
+    p.textContent = text.trim();
+    p.className = 'transcript-line';
+    transcript.appendChild(p);
+    transcript.scrollTop = transcript.scrollHeight;
+}
+
+// --------------------------
+// TEXT PROCESSING & ASL TRANSLATION
+// --------------------------
+async function processText(text) {
+    // Clean and split text into words
+    const words = text
+        .toLowerCase()
+        .replace(/[^\w\s]/g, '')
+        .split(/\s+/)
+        .filter(word => word.length > 0);
+
+    // Queue videos for each word
+    for (const word of words) {
+        videoQueue.push(word);
+    }
+
+    // Start playing videos if not already playing
+    if (!isPlayingVideo) {
+        playNextVideo();
+    }
+}
+
+async function playNextVideo() {
+    if (videoQueue.length === 0) {
+        isPlayingVideo = false;
+        currentWord.textContent = '';
+        return;
+    }
+
+    isPlayingVideo = true;
+    const word = videoQueue.shift();
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(word)}`);
+        const data = await response.json();
+
+        if (response.ok) {
+            displayVideo(data.video_url, data.word);
+            signsPlayed++;
+            updateStats();
+        } else {
+            console.warn(`No ASL sign found for: ${word}`);
+            // Continue to next word
+            playNextVideo();
+        }
+    } catch (error) {
+        console.error(`Error fetching ASL for "${word}":`, error);
+        updateStatus('⚠️ Connection error. Check if backend is running.', 'warning');
+        playNextVideo();
+    }
+}
+
+function displayVideo(videoUrl, word) {
+    const fullUrl = `${API_BASE_URL}${videoUrl}`;
+    
+    // Hide placeholder, show video
+    const placeholder = videoContainer.querySelector('.video-placeholder');
+    if (placeholder) {
+        placeholder.style.display = 'none';
+    }
+    
+    aslVideo.src = fullUrl;
+    aslVideo.style.display = 'block';
+    aslVideo.playbackRate = parseFloat(playbackSpeed.value);
+    
+    currentWord.textContent = `Signing: ${word.toUpperCase()}`;
+    currentWord.style.display = 'block';
+    
+    // Auto-play if setting is enabled
+    if (autoPlay.checked) {
+        aslVideo.play();
+    }
+}
+
+// --------------------------
+// VIDEO EVENT HANDLERS
+// --------------------------
+aslVideo.addEventListener('ended', () => {
+    playNextVideo();
 });
 
-/* =========================
-   LOG QUEUE STATUS (Helpful for debugging)
-========================= */
-setInterval(() => {
-    if (aslQueue.length > 0) {
-        console.log(`📋 Queue: [${aslQueue.join(", ")}]`);
+aslVideo.addEventListener('error', (e) => {
+    console.error('Video error:', e);
+    updateStatus('⚠️ Video failed to load', 'warning');
+    playNextVideo();
+});
+
+playbackSpeed.addEventListener('change', (e) => {
+    aslVideo.playbackRate = parseFloat(e.target.value);
+});
+
+fullscreenBtn.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+        videoContainer.requestFullscreen();
+    } else {
+        document.exitFullscreen();
     }
-}, 3000);
+});
+
+// --------------------------
+// STATISTICS
+// --------------------------
+function updateStats() {
+    wordCount.textContent = wordsRecognized;
+    signCount.textContent = signsPlayed;
+}
+
+async function checkServerHealth() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`);
+        const data = await response.json();
+        
+        console.log('✅ Server Status:', data);
+        totalSigns.textContent = data.total_signs || 0;
+        updateStatus('✅ Connected to server', 'success');
+        
+        // Load available signs (if API provides them)
+        if (data.total_signs) {
+            // You could fetch the mapping here if needed
+        }
+    } catch (error) {
+        console.error('❌ Server not reachable:', error);
+        updateStatus('⚠️ Backend server not connected', 'warning');
+        totalSigns.textContent = '⚠️';
+    }
+}
+
+// --------------------------
+// UI UPDATES
+// --------------------------
+function updateStatus(message, type = 'idle') {
+    status.textContent = message;
+    status.className = `status status-${type}`;
+}
+
+// --------------------------
+// DARK MODE
+// --------------------------
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.contains('dark-mode');
+    localStorage.setItem('darkMode', isDark);
+    updateDarkModeIcon();
+}
+
+function updateDarkModeIcon() {
+    const isDark = document.body.classList.contains('dark-mode');
+    darkModeToggle.textContent = isDark ? '☀️' : '🌙';
+}
+
+// --------------------------
+// SETTINGS MANAGEMENT
+// --------------------------
+function loadSettings() {
+    // Dark mode
+    if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark-mode');
+    }
+
+    // Text size
+    const savedTextSize = localStorage.getItem('textSize') || 'medium';
+    textSize.value = savedTextSize;
+    transcript.style.fontSize = getFontSize(savedTextSize);
+
+    // Auto-play
+    autoPlay.checked = localStorage.getItem('autoPlay') !== 'false';
+
+    // Highlight words
+    highlightWords.checked = localStorage.getItem('highlightWords') !== 'false';
+
+    // Show stats
+    const statsVisible = localStorage.getItem('showStats') !== 'false';
+    showStats.checked = statsVisible;
+    document.querySelector('.stats-bar').style.display = statsVisible ? 'flex' : 'none';
+}
+
+function saveSettings() {
+    localStorage.setItem('textSize', textSize.value);
+    localStorage.setItem('autoPlay', autoPlay.checked);
+    localStorage.setItem('highlightWords', highlightWords.checked);
+    localStorage.setItem('showStats', showStats.checked);
+
+    // Apply settings
+    transcript.style.fontSize = getFontSize(textSize.value);
+    document.querySelector('.stats-bar').style.display = showStats.checked ? 'flex' : 'none';
+
+    closeModal(settingsModal);
+    updateStatus('✅ Settings saved', 'success');
+}
+
+function resetSettings() {
+    localStorage.clear();
+    loadSettings();
+    updateStatus('✅ Settings reset to defaults', 'success');
+}
+
+function getFontSize(size) {
+    const sizes = {
+        small: '0.9rem',
+        medium: '1rem',
+        large: '1.2rem',
+        'x-large': '1.5rem'
+    };
+    return sizes[size] || '1rem';
+}
+
+// --------------------------
+// MODAL MANAGEMENT
+// --------------------------
+function openModal(modal) {
+    modal.hidden = false;
+    modal.style.display = 'flex';
+}
+
+function closeModal(modal) {
+    modal.hidden = true;
+    modal.style.display = 'none';
+}
+
+// --------------------------
+// EVENT LISTENERS
+// --------------------------
+function setupEventListeners() {
+    // Control buttons
+    startBtn.addEventListener('click', startListening);
+    stopBtn.addEventListener('click', stopListening);
+    demoBtn.addEventListener('click', startDemo);
+    clearBtn.addEventListener('click', clearTranscript);
+    downloadBtn.addEventListener('click', downloadTranscript);
+    
+    // UI buttons
+    darkModeToggle.addEventListener('click', toggleDarkMode);
+    
+    // Help modal
+    helpBtn.addEventListener('click', () => openModal(helpModal));
+    helpModal.querySelector('.modal-close').addEventListener('click', () => closeModal(helpModal));
+    
+    // Settings modal
+    settingsBtn.addEventListener('click', () => openModal(settingsModal));
+    settingsModal.querySelector('.modal-close').addEventListener('click', () => closeModal(settingsModal));
+    saveSettingsBtn.addEventListener('click', saveSettings);
+    resetSettingsBtn.addEventListener('click', resetSettings);
+    
+    // Close modals on background click
+    [helpModal, settingsModal].forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal(modal);
+            }
+        });
+    });
+}
+
+// --------------------------
+// KEYBOARD SHORTCUTS
+// --------------------------
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Ignore if typing in input field
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        switch(e.key.toLowerCase()) {
+            case ' ': // Space - Start/Stop
+                e.preventDefault();
+                if (isListening) {
+                    stopListening();
+                } else {
+                    startListening();
+                }
+                break;
+            case 'escape': // Esc - Clear
+                clearTranscript();
+                break;
+            case 'd': // D - Demo
+                startDemo();
+                break;
+            case 's': // S - Save/Download
+                downloadTranscript();
+                break;
+            case '?': // ? - Help
+                openModal(helpModal);
+                break;
+        }
+    });
+}
+
+// --------------------------
+// CONSOLE WELCOME MESSAGE
+// --------------------------
+console.log('%c🌉 LingoBridge', 'font-size: 24px; font-weight: bold; color: #667eea;');
+console.log('%cReal-time Speech to ASL Translation System', 'font-size: 14px; color: #718096;');
+console.log('%cFor support: https://github.com/Kyreena/LingoBridge', 'font-size: 12px; color: #4299e1;');

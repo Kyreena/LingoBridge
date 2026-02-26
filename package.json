@@ -1,0 +1,33 @@
+{
+  "name": "lingobridge",
+  "version": "1.0.0",
+  "description": "Real-time speech-to-sign language translation system for inclusive education",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "test": "echo 'Open test.html in your browser to run tests'",
+    "deploy": "echo 'Deploy to GitHub Pages: git push origin main'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kyreena/LingoBridge.git"
+  },
+  "keywords": [
+    "asl",
+    "sign-language",
+    "speech-recognition",
+    "accessibility",
+    "education",
+    "inclusive-education",
+    "web-speech-api",
+    "assistive-technology"
+  ],
+  "author": "LingoBridge Contributors",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Kyreena/LingoBridge/issues"
+  },
+  "homepage": "https://github.com/Kyreena/LingoBridge#readme",
+  "devDependencies": {},
+  "dependencies": {}
+}

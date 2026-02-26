@@ -2,10 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>LingoBridge – Speech to ASL</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-        <title>LingoBridge - Real-time Speech to ASL Translation for Inclusive Education</title>
+    <title>LingoBridge - Real-time Speech to ASL Translation for Inclusive Education</title>
     <meta name="description" content="Web-based real-time speech-to-sign language translation system for inclusive classroom communication. Converts spoken English to ASL video signs instantly.">
     <meta name="keywords" content="ASL, sign language, speech recognition, inclusive education, accessibility, deaf education, real-time translation">
     <meta name="author" content="LingoBridge">
@@ -47,6 +45,7 @@
         }
     }
     </script>
+    
     <!-- CSS -->
     <link rel="stylesheet" href="style.css" />
 </head>
@@ -57,27 +56,23 @@
         <h1>LingoBridge</h1>
         <p>Real-time Speech to ASL Interpretation for Inclusive Learning</p>
         <div class="header-actions">
-                <button id="darkModeToggle" class="btn-icon" aria-label="Toggle dark mode" title="Toggle dark mode">
-                    🌙
-                </button>
-                <button id="helpBtn" class="btn-icon" aria-label="Show help" title="Show help">
-                    ❓
-                </button>
-                <button id="settingsBtn" class="btn-icon" aria-label="Open settings" title="Open settings">
-                    ⚙️
-                </button>
-            </div>
+            <button id="darkModeToggle" class="btn-icon" aria-label="Toggle dark mode" title="Toggle dark mode">
+                🌙
+            </button>
+            <button id="helpBtn" class="btn-icon" aria-label="Show help" title="Show help">
+                ❓
+            </button>
+            <button id="settingsBtn" class="btn-icon" aria-label="Open settings" title="Open settings">
+                ⚙️
+            </button>
+        </div>
     </header>
 
-
     <!-- ================= APP CONTAINER ================= -->
-    <main>
-      <main role="main">
-        <section class="controls">
-                <button id="startBtn" class="btn btn-primary">
-                    <span class="icon">🎤</span> Start Listening
-
-                    <section class="controls" role="toolbar" aria-label="Main controls">
+    <div class="app">
+        <main role="main">
+            <!-- Controls Section -->
+            <section class="controls" role="toolbar" aria-label="Main controls">
                 <button id="startBtn" class="btn btn-primary" aria-label="Start listening to speech">
                     <span class="icon" aria-hidden="true">🎤</span> Start Listening
                 </button>
@@ -87,25 +82,18 @@
                 <button id="demoBtn" class="btn btn-demo" aria-label="Start demo mode">
                     <span class="icon" aria-hidden="true">🎬</span> Demo
                 </button>
-                <button id="stopBtn" class="btn btn-secondary" disabled>
-                    <span class="icon">⏹️</span> Stop
                 <button id="clearBtn" class="btn btn-tertiary" aria-label="Clear transcript">
                     <span class="icon" aria-hidden="true">🗑️</span> Clear
                 </button>
-                <button id="clearBtn" class="btn btn-tertiary">
-                    <span class="icon">🗑️</span> Clear
-                <button id="stopBtn" class="btn btn-secondary" disabled>
-                    <span class="icon">⏹️</span> Stop
-                </button>
-                <button id="clearBtn" class="btn btn-tertiary">
-                    <span class="icon">🗑️</span> Clear
                 <button id="downloadBtn" class="btn btn-download" aria-label="Download transcript">
                     <span class="icon" aria-hidden="true">⬇️</span> Download
                 </button>
-                <div id="status" class="status">Ready to start</div>
-                <div id="status" class="status" role="status" aria-live="polite">Ready to start</div>
             </section>
             
+            <!-- Status -->
+            <div id="status" class="status" role="status" aria-live="polite">Ready to start</div>
+            
+            <!-- Statistics Bar -->
             <section class="stats-bar" role="region" aria-label="Statistics">
                 <div class="stat-item">
                     <span class="stat-label">Words Recognized:</span>
@@ -117,21 +105,22 @@
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">Available Signs:</span>
-                    <span id="totalSigns" class="stat-value">56</span>
+                    <span id="totalSigns" class="stat-value">0</span>
                 </div>
             </section>
-            <div class="content-grid">
-                <section class="transcript-section">
-                <section class="transcript-section" role="region" aria-label="Live transcript">
+            
+            <!-- Main Content Grid -->
+            <div class="main-content">
+                <!-- Transcript Panel -->
+                <section class="card transcript-panel" role="region" aria-label="Live transcript">
                     <h2>Live Transcript</h2>
-                    <div id="transcript" class="transcript-box">
-                    <div id="transcript" class="transcript-box" role="log" aria-live="polite">
+                    <div id="transcript" class="transcript" role="log" aria-live="polite">
                         <p class="placeholder">Spoken words will appear here...</p>
                     </div>
                 </section>
 
-                <section class="video-section">
-                <section class="video-section" role="region" aria-label="ASL video translation">
+                <!-- Video Panel -->
+                <section class="card video-panel" role="region" aria-label="ASL video translation">
                     <h2>ASL Translation</h2>
                     <div class="video-controls">
                         <button id="fullscreenBtn" class="btn-icon" aria-label="Toggle fullscreen" title="Fullscreen">
@@ -148,46 +137,25 @@
                     </div>
                     <div id="videoContainer" class="video-container">
                         <div class="video-placeholder">
-                            <span class="icon-large">👋</span>
-                    <h2>ASL Translation</h2>
-                    <div id="videoContainer" class="video-container">
-                        <div class="video-placeholder">
-                            <span class="icon-large">👋</span>
                             <span class="icon-large" aria-hidden="true">👋</span>
                             <p>ASL signs will be displayed here</p>
                         </div>
-                        <video id="aslVideo" class="asl-video" controls></video>
                         <video id="aslVideo" class="asl-video" controls aria-label="ASL sign video"></video>
                     </div>
-                    <div id="currentWord" class="current-word"></div>
-                </section>
-                        </div>
-                        <video id="aslVideo" class="asl-video" controls></video>
-                    </div>
-                    <div id="currentWord" class="current-word"></div>
                     <div id="currentWord" class="current-word" role="status" aria-live="polite"></div>
                 </section>
-            </div>     
-      </main>  
-    </main>
-            <footer>
+            </div>
+        </main>
+        
+        <!-- Footer -->
         <footer role="contentinfo">
             <p>LingoBridge - Supporting inclusive education through technology</p>
-            <p class="footer-links">
-                <a href="https://github.com/Kyreena/LingoBridge" target="_blank" rel="noopener">GitHub</a> |
-                <a href="LICENSE" target="_blank">License</a> |
-                <a href="CONTRIBUTING.md" target="_blank">Contributing</a> |
-                <a href="CHANGELOG.md" target="_blank">Changelog</a>
-            </p>
             <p class="keyboard-shortcuts">
                 <small>Keyboard shortcuts: <kbd>Space</kbd> Start/Stop | <kbd>Esc</kbd> Clear | <kbd>D</kbd> Demo | <kbd>?</kbd> Help</small>
             </p>
         </footer>
     </div>
-        <footer>
-            <p>LingoBridge - Supporting inclusive education through technology</p>
-        </footer>
-    </div>
+
     <!-- Help Modal -->
     <div id="helpModal" class="modal" role="dialog" aria-labelledby="helpModalTitle" aria-modal="true" hidden>
         <div class="modal-content">
@@ -232,6 +200,7 @@
             </div>
         </div>
     </div>
+
     <!-- Settings Modal -->
     <div id="settingsModal" class="modal" role="dialog" aria-labelledby="settingsModalTitle" aria-modal="true" hidden>
         <div class="modal-content">
@@ -272,7 +241,8 @@
             </div>
         </div>
     </div>
-    <!-- ================= JS ================= -->
+
+    <!-- JavaScript -->
     <script src="script.js"></script>
 
 </body>
