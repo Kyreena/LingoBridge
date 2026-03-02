@@ -1,0 +1,192 @@
+═══════════════════════════════════════════════════════════
+  NEW WORDS ADDED TO REPOSITORY (141 words)
+═══════════════════════════════════════════════════════════
+
+Your local file: 116 words
+Repository file: 261 words
+NEW words added: 223 words
+
+═══════════════════════════════════════════════════════════
+  COMPLETE LIST OF NEW WORDS
+═══════════════════════════════════════════════════════════
+
+
+Pronouns (10):
+------------------------------------------------------------
+i, me, we, us, he, she, they, it, this, that
+
+Greetings (3):
+------------------------------------------------------------
+hi, bye, yes, no
+
+Common Verbs (24):
+------------------------------------------------------------
+eat, drink, sit, stand, walk, run, go, see, look, hear, 
+talk, speak, say, tell, ask, give, take, make, do, play, 
+start, finish, open, close
+
+Family (17):
+------------------------------------------------------------
+mother, mom, father, dad, parent, parents, sister, brother, 
+family, friend, boy, girl, man, woman, baby, child, people
+
+Colors (11):
+------------------------------------------------------------
+color, red, blue, green, yellow, orange, purple, pink, 
+black, white, brown
+
+Food & Drink (13):
+------------------------------------------------------------
+food, water, milk, juice, coffee, tea, bread, apple, 
+banana, cookie, cake, candy
+
+Education (7):
+------------------------------------------------------------
+quiz, exam, study, science, art, music, computer, paper, 
+pen
+
+Emotions (13):
+------------------------------------------------------------
+angry, mad, excited, surprised, tired, sick, hurt, pain, 
+afraid, scared, worry, sorry, excuse
+
+Places & Objects (15):
+------------------------------------------------------------
+house, car, bus, train, phone, door, window, bed, bathroom, 
+kitchen, store, hospital
+
+Time & Days (16):
+------------------------------------------------------------
+night, week, month, year, hour, minute, monday, tuesday, 
+wednesday, thursday, friday, saturday, sunday, now, later, 
+yesterday
+
+Numbers (22):
+------------------------------------------------------------
+one, two, three, four, five, six, seven, eight, nine, ten, 
+eleven, twelve, thirteen, fourteen, fifteen, sixteen, 
+seventeen, eighteen, nineteen, twenty, hundred, thousand
+
+Adjectives (29):
+------------------------------------------------------------
+new, old, young, hot, cold, warm, cool, fast, slow, easy, 
+hard, difficult, right, wrong, correct, same, different, 
+more, less, many, much, little, few, all, some, every, 
+none, nice, great, fine, ok, okay, big, small, happy, sad
+
+Actions & States (12):
+------------------------------------------------------------
+learning, reading, writing, think, want, need, like, read, 
+learn
+
+Connectors (11):
+------------------------------------------------------------
+ready, wait, again, repeat, remember, forget, important, 
+use, share, turn, change, keep, stay, leave, arrive
+
+
+═══════════════════════════════════════════════════════════
+  ALPHABETICAL LIST OF ALL NEW WORDS
+═══════════════════════════════════════════════════════════
+
+afraid          again           all             angry           apple           
+
+arrive          art             ask             baby            banana          
+
+bathroom        bed             big             black           blue            
+
+boy             bread           brother         brown           bus             
+
+bye             cake            candy           car             change          
+
+child           close           coffee          cold            color           
+
+computer        cookie          cool            correct         dad             
+
+different       difficult       do              door            drink           
+
+easy            eat             eight           eighteen        eleven          
+
+every           exam            excited         excuse          family          
+
+fast            father          few             fifteen         fine            
+
+finish          five            food            forget          four            
+
+fourteen        friday          friend          girl            give            
+
+go              goodbye         great           green           happy           
+
+hard            he              hear            hi              hospital        
+
+hot             hour            house           how             hundred         
+
+hurt            i               important       it              juice           
+
+keep            kitchen         later           learn           learning        
+
+leave           less            like            little          look            
+
+mad             make            man             many            me              
+
+milk            minute          mom             monday          month           
+
+more            mother          much            music           need            
+
+new             nice            night           nine            nineteen        
+
+no              none            now             ok              okay            
+
+old             one             open            orange          pain            
+
+paper           parent          parents         pen             people          
+
+phone           pink            play            problem         purple          
+
+quiz            read            reading         ready           red             
+
+remember        repeat          right           run             sad             
+
+same            saturday        say             scared          school          
+
+science         see             seven           seventeen       share           
+
+she             sick            sister          sit             six             
+
+sixteen         slow            small           some            sorry           
+
+speak           stand           start           stay            store           
+
+study           sunday          surprised       take            talk            
+
+tea             tell            ten             test            thank           
+
+thanks          that            they            think           thirteen        
+
+this            thousand        three           thursday        tired           
+
+train           tuesday         turn            twelve          twenty          
+
+two             us              use             wait            walk            
+
+want            warm            water           we              wednesday       
+
+week            what            when            where           white           
+
+who             why             window          woman           worry           
+
+writing         wrong           year            yellow          yes             
+
+yesterday       you             young           
+
+═══════════════════════════════════════════════════════════
+  HOW TO GET THE COMPLETE FILE
+═══════════════════════════════════════════════════════════
+
+View on GitHub:
+https://github.com/Kyreena/LingoBridge/blob/copilot/add-speech-to-sign-translation/asl_mapping.json
+
+Direct download:
+https://raw.githubusercontent.com/Kyreena/LingoBridge/copilot/add-speech-to-sign-translation/asl_mapping.json
+
+See: HOW_TO_VIEW_COMPLETE_FILE.md for detailed instructions
