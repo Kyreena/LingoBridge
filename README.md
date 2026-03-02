@@ -6,7 +6,7 @@ LingoBridge is a web-based real-time speech-to-sign language translation system 
 
 ![LingoBridge Demo](https://img.shields.io/badge/Status-Active-success)
 ![Language](https://img.shields.io/badge/Language-JavaScript-yellow)
-![ASL Signs](https://img.shields.io/badge/ASL%20Signs-56-blue)
+![ASL Signs](https://img.shields.io/badge/ASL%20Signs-261-blue)
 
 ## 🎯 Features
 
@@ -82,7 +82,7 @@ The system consists of three main components:
 
 2. **ASL Library** (`asl-library.js`)
    - Maps English words to ASL video URLs
-   - Currently includes 56 common words and phrases
+   - Currently includes 261 words and phrases
    - Easily extensible with more signs
 
 3. **User Interface** (`index.html`, `styles.css`)
@@ -92,15 +92,24 @@ The system consists of three main components:
 
 ### Supported Words
 
-The current library includes:
-- **Greetings**: hello, hi, goodbye, bye
-- **Courtesy**: please, thank you, yes, no
-- **Classroom**: teacher, student, learn, book, read, write, class, school
+The current library includes **261 words** across these categories:
+- **Greetings & Courtesy**: hello, hi, goodbye, bye, please, thank you, yes, no
+- **Pronouns**: I, me, we, us, he, she, they, it, this, that
+- **Common Verbs**: eat, drink, sit, stand, walk, run, come, go, see, look, hear, listen, talk, speak, say, tell, ask, answer, give, take, make, do, work, play, stop, start, finish, open, close
+- **Family & People**: mother, father, sister, brother, family, friend, boy, girl, man, woman, baby, child, people, parent, parents
+- **Classroom**: teacher, student, learn, book, read, write, class, school, homework, test, quiz, exam, study, practice, question, problem, computer, paper, pencil, pen, desk, chair
+- **Subjects**: math, science, english, history, art, music
 - **Questions**: what, where, when, who, why, how
 - **Actions**: help, understand, know, think, want, need, like
-- **Time**: today, tomorrow, yesterday, now, later
-- **Numbers**: one through ten
-- **Adjectives**: good, bad, big, small, happy, sad
+- **Colors**: red, blue, green, yellow, orange, purple, pink, black, white, brown
+- **Food & Drink**: food, water, milk, juice, coffee, tea, bread, apple, banana, orange, cookie, cake, candy
+- **Time**: today, tomorrow, yesterday, now, later, day, night, week, month, year, time, hour, minute, morning, afternoon, evening
+- **Days of Week**: monday, tuesday, wednesday, thursday, friday, saturday, sunday
+- **Numbers**: one through twenty, hundred, thousand
+- **Emotions**: happy, sad, angry, mad, excited, surprised, tired, sick, hurt, pain, afraid, scared, worry, sorry
+- **Adjectives**: good, bad, big, small, new, old, young, hot, cold, warm, cool, fast, slow, easy, hard, difficult, right, wrong, correct, same, different, more, less, many, much, little, few, all, some, every, none, nice, great, fine, ok
+- **Places & Objects**: house, home, car, bus, train, phone, door, window, table, bed, bathroom, kitchen, store, library, hospital
+- **Other Useful Words**: ready, wait, again, repeat, remember, forget, important, try, use, share, turn, change, keep, stay, leave, arrive, excuse
 
 ### Browser Compatibility
 
@@ -150,7 +159,7 @@ this.recognition.lang = 'en-US';       // Language
 
 - **Recognition Latency**: < 1 second for speech-to-text
 - **Video Loading**: Depends on internet connection
-- **Supported Sign Library**: 56 words (expandable)
+- **Supported Sign Library**: 261 words (expandable)
 - **Browser Resource Usage**: Minimal
 
 ## 🔒 Privacy & Security
