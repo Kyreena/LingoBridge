@@ -350,6 +350,47 @@ body {
     color: #3498db;
     min-height: 30px;
 }
+.translation-display {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.original-text-box,
+.missing-words-box {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+}
+
+.original-text-box h3 {
+    color: #495057;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.current-sentence {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #212529;
+}
+
+.missing-words {
+    color: #dc3545;
+    font-weight: 500;
+}
+
+.dark-mode .original-text-box,
+.dark-mode .missing-words-box {
+    background: #2d3748;
+    border-color: #4a5568;
+}
+
+.dark-mode .current-sentence {
+    color: #e2e8f0;
+}
 
 /* =========================
    FOOTER
