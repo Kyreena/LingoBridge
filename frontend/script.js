@@ -37,6 +37,10 @@ const wordCount = document.getElementById('wordCount');
 const signCount = document.getElementById('signCount');
 const totalSigns = document.getElementById('totalSigns');
 
+// Translation display
+const currentSentence = document.getElementById('currentSentence');
+const missingWords = document.getElementById('missingWords');
+
 // Modals
 const helpModal = document.getElementById('helpModal');
 const settingsModal = document.getElementById('settingsModal');
@@ -57,6 +61,7 @@ let signsPlayed = 0;
 let videoQueue = [];
 let isPlayingVideo = false;
 let availableSigns = new Set();
+let isFingerspelling = false;
 
 // --------------------------
 // INITIALIZATION
@@ -126,7 +131,6 @@ function initializeSpeechRecognition() {
 
     recognition.onend = () => {
         if (isListening) {
-            // Restart if it was still supposed to be listening
             try {
                 recognition.start();
             } catch (e) {
@@ -168,6 +172,8 @@ function stopListening() {
 
 function clearTranscript() {
     transcript.innerHTML = '<p class="placeholder">Spoken words will appear here...</p>';
+    currentSentence.textContent = '';
+    missingWords.textContent = 'None';
     wordsRecognized = 0;
     signsPlayed = 0;
     updateStats();
@@ -209,7 +215,6 @@ function downloadTranscript() {
 // TRANSCRIPT MANAGEMENT
 // --------------------------
 function addToTranscript(text) {
-    // Remove placeholder if it exists
     const placeholder = transcript.querySelector('.placeholder');
     if (placeholder) {
         placeholder.remove();
@@ -230,6 +235,9 @@ function addToTranscript(text) {
 // TEXT PROCESSING & ASL TRANSLATION
 // --------------------------
 async function processText(text) {
+    // Show the original text
+    currentSentence.textContent = text;
+    
     // Clean and split text into words
     const words = text
         .toLowerCase()
@@ -237,9 +245,36 @@ async function processText(text) {
         .split(/\s+/)
         .filter(word => word.length > 0);
 
-    // Queue videos for each word
+    const missingWordsList = [];
+
+    // Check each word and queue for video playback
     for (const word of words) {
-        videoQueue.push(word);
+        try {
+            const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(word)}`);
+            
+            if (response.ok) {
+                // Word has a direct ASL sign
+                videoQueue.push({ type: 'word', value: word });
+            } else {
+                // Word not found - will be fingerspelled
+                console.log(`Word "${word}" not in library - will fingerspell`);
+                missingWordsList.push(word);
+                videoQueue.push({ type: 'fingerspell', value: word });
+            }
+        } catch (error) {
+            console.error(`Error checking word "${word}":`, error);
+            missingWordsList.push(word);
+            videoQueue.push({ type: 'fingerspell', value: word });
+        }
+    }
+
+    // Display missing words that will be fingerspelled
+    if (missingWordsList.length > 0) {
+        missingWords.textContent = missingWordsList.join(', ');
+        missingWords.style.color = '#e67e22'; // Orange for fingerspelling
+    } else {
+        missingWords.textContent = 'None';
+        missingWords.style.color = '#27ae60'; // Green for all found
     }
 
     // Start playing videos if not already playing
@@ -248,80 +283,42 @@ async function processText(text) {
     }
 }
 
-// Add this function after processText()
-async function fingerspellWord(word) {
-    const letters = word.split('');
-    
-    // Show fingerspelling indicator
-    currentWord.textContent = `Fingerspelling: ${word.toUpperCase()}`;
-    currentWord.style.backgroundColor = '#ffc107'; // Yellow background
-    
-    for (const letter of letters) {
-        videoQueue.push(letter); // Queue each letter
-    }
-}
-
-// Modify playNextVideo() function
+// --------------------------
+// VIDEO PLAYBACK
+// --------------------------
 async function playNextVideo() {
     if (videoQueue.length === 0) {
         isPlayingVideo = false;
+        isFingerspelling = false;
         currentWord.textContent = '';
-        currentWord.style.backgroundColor = ''; // Reset background
+        currentWord.style.backgroundColor = '';
         return;
     }
 
     isPlayingVideo = true;
-    const word = videoQueue.shift();
+    const item = videoQueue.shift();
 
+    if (item.type === 'word') {
+        // Play full word sign
+        await playWordSign(item.value);
+    } else if (item.type === 'fingerspell') {
+        // Fingerspell the word letter by letter
+        await fingerspellWord(item.value);
+    }
+}
+
+async function playWordSign(word) {
     try {
         const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(word)}`);
         const data = await response.json();
 
         if (response.ok) {
-            displayVideo(data.video_url, data.word);
-            signsPlayed++;
-            updateStats();
-        } else {
-            // ✅ NEW: Word not found - try fingerspelling
-            console.warn(`No ASL sign found for: ${word} - attempting fingerspelling`);
-            
-            if (word.length === 1) {
-                // It's already a letter, skip
-                playNextVideo();
-            } else {
-                // Fingerspell the word
-                await fingerspellWord(word);
-            }
-        }
-    } catch (error) {
-        console.error(`Error fetching ASL for "${word}":`, error);
-        updateStatus('⚠️ Connection error. Check if backend is running.', 'warning');
-        playNextVideo();
-    }
-}
-
-async function playNextVideo() {
-    if (videoQueue.length === 0) {
-        isPlayingVideo = false;
-        currentWord.textContent = '';
-        return;
-    }
-
-    isPlayingVideo = true;
-    const word = videoQueue.shift();
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(word)}`);
-        const data = await response.json();
-
-        if (response.ok) {
-            displayVideo(data.video_url, data.word);
+            displayVideo(data.video_url, word, false);
             signsPlayed++;
             updateStats();
         } else {
             console.warn(`No ASL sign found for: ${word}`);
-            // Continue to next word
-            playNextVideo();
+            playNextVideo(); // Continue to next item
         }
     } catch (error) {
         console.error(`Error fetching ASL for "${word}":`, error);
@@ -330,7 +327,48 @@ async function playNextVideo() {
     }
 }
 
-function displayVideo(videoUrl, word) {
+async function fingerspellWord(word) {
+    console.log(`Fingerspelling word: ${word}`);
+    isFingerspelling = true;
+    
+    // Show fingerspelling indicator
+    currentWord.textContent = `Fingerspelling: ${word.toUpperCase()}`;
+    currentWord.style.backgroundColor = '#f39c12'; // Orange background
+    
+    const letters = word.split('');
+    
+    for (let i = 0; i < letters.length; i++) {
+        const letter = letters[i].toLowerCase();
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(letter)}`);
+            const data = await response.json();
+
+            if (response.ok) {
+                // Display each letter with brief pause
+                await displayVideoAndWait(data.video_url, `${letter.toUpperCase()} (${i+1}/${letters.length})`, true);
+                signsPlayed++;
+                updateStats();
+            } else {
+                console.warn(`No fingerspelling sign for letter: ${letter}`);
+                // Show placeholder for missing letter
+                await showLetterPlaceholder(letter.toUpperCase(), 1000);
+            }
+        } catch (error) {
+            console.error(`Error fetching fingerspelling for "${letter}":`, error);
+            await showLetterPlaceholder(letter.toUpperCase(), 1000);
+        }
+    }
+    
+    // Finished fingerspelling this word
+    isFingerspelling = false;
+    currentWord.style.backgroundColor = '';
+    
+    // Continue with next item in queue
+    playNextVideo();
+}
+
+function displayVideo(videoUrl, word, isLetter) {
     const fullUrl = `${API_BASE_URL}${videoUrl}`;
     
     // Hide placeholder, show video
@@ -343,7 +381,13 @@ function displayVideo(videoUrl, word) {
     aslVideo.style.display = 'block';
     aslVideo.playbackRate = parseFloat(playbackSpeed.value);
     
-    currentWord.textContent = `Signing: ${word.toUpperCase()}`;
+    if (isLetter) {
+        currentWord.textContent = `Fingerspelling: ${word}`;
+        currentWord.style.backgroundColor = '#f39c12';
+    } else {
+        currentWord.textContent = `Signing: ${word.toUpperCase()}`;
+        currentWord.style.backgroundColor = '';
+    }
     currentWord.style.display = 'block';
     
     // Auto-play if setting is enabled
@@ -352,17 +396,70 @@ function displayVideo(videoUrl, word) {
     }
 }
 
+// Helper function to display video and wait for completion
+function displayVideoAndWait(videoUrl, label, isLetter) {
+    return new Promise((resolve) => {
+        const fullUrl = `${API_BASE_URL}${videoUrl}`;
+        
+        const placeholder = videoContainer.querySelector('.video-placeholder');
+        if (placeholder) {
+            placeholder.style.display = 'none';
+        }
+        
+        aslVideo.src = fullUrl;
+        aslVideo.style.display = 'block';
+        aslVideo.playbackRate = parseFloat(playbackSpeed.value) * 1.2; // Slightly faster for fingerspelling
+        
+        currentWord.textContent = label;
+        if (isLetter) {
+            currentWord.style.backgroundColor = '#f39c12';
+        }
+        
+        // Remove old event listeners
+        const newVideo = aslVideo.cloneNode(true);
+        aslVideo.parentNode.replaceChild(newVideo, aslVideo);
+        Object.assign(aslVideo, newVideo);
+        
+        aslVideo.onended = () => {
+            resolve();
+        };
+        
+        aslVideo.onerror = () => {
+            console.error('Video playback error');
+            resolve();
+        };
+        
+        aslVideo.play().catch(err => {
+            console.error('Video play error:', err);
+            resolve();
+        });
+    });
+}
+
+// Show placeholder when letter video is missing
+function showLetterPlaceholder(letter, duration) {
+    return new Promise((resolve) => {
+        currentWord.textContent = `Letter: ${letter} (No video available)`;
+        currentWord.style.backgroundColor = '#e74c3c'; // Red for missing
+        setTimeout(resolve, duration);
+    });
+}
+
 // --------------------------
 // VIDEO EVENT HANDLERS
 // --------------------------
 aslVideo.addEventListener('ended', () => {
-    playNextVideo();
+    if (!isFingerspelling) {
+        playNextVideo();
+    }
 });
 
 aslVideo.addEventListener('error', (e) => {
     console.error('Video error:', e);
-    updateStatus('⚠️ Video failed to load', 'warning');
-    playNextVideo();
+    if (!isFingerspelling) {
+        updateStatus('⚠️ Video failed to load', 'warning');
+        playNextVideo();
+    }
 });
 
 playbackSpeed.addEventListener('change', (e) => {
@@ -393,64 +490,13 @@ async function checkServerHealth() {
         console.log('✅ Server Status:', data);
         totalSigns.textContent = data.total_signs || 0;
         updateStatus('✅ Connected to server', 'success');
-        
-        // Load available signs (if API provides them)
-        if (data.total_signs) {
-            // You could fetch the mapping here if needed
-        }
     } catch (error) {
         console.error('❌ Server not reachable:', error);
         updateStatus('⚠️ Backend server not connected', 'warning');
         totalSigns.textContent = '⚠️';
     }
 }
-// Add after DOM elements section
-const currentSentence = document.getElementById('currentSentence');
-const missingWords = document.getElementById('missingWords');
 
-// Update processText function
-async function processText(text) {
-    // Show the original text
-    currentSentence.textContent = text;
-    
-    const words = text
-        .toLowerCase()
-        .replace(/[^\w\s]/g, '')
-        .split(/\s+/)
-        .filter(word => word.length > 0);
-
-    const found = [];
-    const missing = [];
-
-    // Check which words we have
-    for (const word of words) {
-        try {
-            const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(word)}`);
-            if (response.ok) {
-                found.push(word);
-                videoQueue.push(word);
-            } else {
-                missing.push(word);
-                videoQueue.push(word); // Still queue it for fingerspelling
-            }
-        } catch (error) {
-            missing.push(word);
-        }
-    }
-
-    // Display missing words
-    if (missing.length > 0) {
-        missingWords.textContent = missing.join(', ');
-        missingWords.style.display = 'block';
-    } else {
-        missingWords.textContent = 'None';
-    }
-
-    // Start playing videos
-    if (!isPlayingVideo) {
-        playNextVideo();
-    }
-}
 // --------------------------
 // UI UPDATES
 // --------------------------
