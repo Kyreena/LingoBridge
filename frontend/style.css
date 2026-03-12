@@ -263,6 +263,19 @@ body {
     animation: slideIn 0.3s ease;
 }
 
+.transcript-lyrics .transcript-line {
+  background: #ffffff;
+  border-left: 3px solid #3498db;
+  opacity: 0.85;
+}
+
+.transcript-lyrics .transcript-line.is-current {
+  background: #d6eaf8;
+  font-weight: 700;
+  opacity: 1;
+  border-left-color: #1f78c1;
+}
+
 @keyframes slideIn {
     from {
         opacity: 0;
@@ -341,7 +354,7 @@ body {
     border-radius: 8px;
 
     opacity: 0;
-    transition: opacity 160ms linear; /* Smooth fade-in for video */
+    transition: opacity 200ms linear; /* Smooth fade-in for video */
     background: black;
 }
 

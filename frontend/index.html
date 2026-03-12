@@ -79,6 +79,14 @@
                 <button id="stopBtn" class="btn btn-secondary" disabled aria-label="Stop listening">
                     <span class="icon" aria-hidden="true">⏹️</span> Stop
                 </button>
+                 <button id="pauseBtn" class="btn btn-tertiary" disabled aria-label="Pause interpretation">
+                    <span class="icon" aria-hidden="true">⏸️</span> Pause
+                </button>
+  
+                <button id="resumeBtn" class="btn btn-primary" disabled aria-label="Resume interpretation">
+                    <span class="icon" aria-hidden="true">▶️</span> Resume
+                </button>
+                
                 <button id="demoBtn" class="btn btn-demo" aria-label="Start demo mode">
                     <span class="icon" aria-hidden="true">🎬</span> Demo
                 </button>
@@ -114,7 +122,7 @@
                 <!-- Transcript Panel -->
                 <section class="card transcript-panel" role="region" aria-label="Live transcript">
                     <h2>Live Transcript</h2>
-                    <div id="transcript" class="transcript" role="log" aria-live="polite">
+                    <div id="transcript" class="transcript transcript-lyrics" role="log" aria-live="polite">
                         <p class="placeholder">Spoken words will appear here...</p>
                     </div>
                 </section>
@@ -140,10 +148,12 @@
                             <span class="icon-large" aria-hidden="true">👋</span>
                             <p>ASL signs will be displayed here</p>
                         </div>
-                        <video id="aslVideo" class="asl-video" playsinline preload="auto" muted></video>
-                        <video id="aslVideo" class="asl-video" playsinline preload="auto" muted></video>
+                        
+                        <video id="aslVideoA" class="asl-video" playsinline preload="auto" muted></video>
+                        <video id="aslVideoB" class="asl-video" playsinline preload="auto" muted></video>
                     </div>
-                    <div id="currentWord" class="current-word" style="display:none;"></div>
+                    
+                    <div id="currentWord" class="current-word" role="status" aria-live="polite"></div>
                 </section>
             </div>
         </main>
