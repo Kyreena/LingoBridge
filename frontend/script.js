@@ -28,7 +28,9 @@ const resetSettingsBtn = document.getElementById('resetSettings');
 const status = document.getElementById('status');
 const transcript = document.getElementById('transcript');
 const videoContainer = document.getElementById('videoContainer');
-const aslVideo = document.getElementById('aslVideo');
+const aslVideoA = document.getElementById('aslVideoA');
+const aslVideoB = document.getElementById('aslVideoB');
+//const aslVideo = document.getElementById('aslVideo');
 const currentWord = document.getElementById('currentWord');
 const playbackSpeed = document.getElementById('playbackSpeed');
 
@@ -60,7 +62,6 @@ let wordsRecognized = 0;
 let signsPlayed = 0;
 let videoQueue = [];
 let isPlayingVideo = false;
-let availableSigns = new Set();
 let isFingerspelling = false;
 
 // --------------------------
@@ -76,6 +77,162 @@ window.addEventListener('load', async () => {
 });
 
 // --------------------------
+// SMOOTH VIDEO PLAYER (A/B)
+// --------------------------
+const smoothPlayer = (() => {
+    let active = aslVideoA;
+    let inactive = aslVideoB;
+
+    // initialize
+    active.classList.add('is-active');
+    inactive.classList.remove('is-active');
+
+    function getFullUrl(videoUrl) {
+        return `${API_BASE_URL}${videoUrl}`;
+    }
+
+    async function prime(url) {
+        // Load on inactive and wait until it can play through enough to start smoothly
+        inactive.pause();
+        inactive.currentTime = 0;
+        inactive.src = url;
+
+        // Make sure playbackRate is set before play
+        inactive.playbackRate = parseFloat(playbackSpeed.value);
+
+        // Wait for readiness (best effort)
+        await new Promise((resolve) => {
+            const done = () => {
+                inactive.removeEventListener('canplay', done);
+                inactive.removeEventListener('loadeddata', done);
+                resolve();
+            };
+
+            inactive.addEventListener('canplay', done, { once: true });
+            inactive.addEventListener('loadeddata', done, { once: true });
+
+            // Safety timeout so we never hang
+            setTimeout(resolve, 400);
+        });
+    }
+
+    async function playNow(videoUrl, opts = {}) {
+        const { rateMultiplier = 1.0 } = opts;
+        const url = getFullUrl(videoUrl);
+
+        // Prime inactive with next clip
+        await prime(url);
+
+        // Swap
+        const prev = active;
+        active = inactive;
+        inactive = prev;
+
+        // Show active / hide inactive (crossfade)
+        active.classList.add('is-active');
+        inactive.classList.remove('is-active');
+
+        // Play active
+        active.playbackRate = parseFloat(playbackSpeed.value) * rateMultiplier;
+
+        if (autoPlay.checked) {
+            try {
+                await active.play();
+            } catch (e) {
+                console.error('Autoplay prevented / play failed:', e);
+            }
+        }
+    }
+
+    function waitForEndOrError() {
+        return new Promise((resolve) => {
+            const onEnd = () => cleanupAndResolve();
+            const onError = () => cleanupAndResolve();
+
+            const cleanupAndResolve = () => {
+                active.removeEventListener('ended', onEnd);
+                active.removeEventListener('error', onError);
+                resolve();
+            };
+
+            active.addEventListener('ended', onEnd, { once: true });
+            active.addEventListener('error', onError, { once: true });
+        });
+    }
+
+    return {
+        playNow,
+        waitForEndOrError,
+        // Expose for debugging if needed
+        getActive: () => active
+    };
+})();
+
+// --------------------------
+// Replace displayVideo + displayVideoAndWait
+// --------------------------
+async function displayVideo(videoUrl, word, isLetter) {
+    // Hide placeholder
+    const placeholder = videoContainer.querySelector('.video-placeholder');
+    if (placeholder) placeholder.style.display = 'none';
+
+    if (isLetter) {
+        currentWord.textContent = `Fingerspelling: ${word}`;
+        currentWord.style.backgroundColor = '#f39c12';
+    } else {
+        currentWord.textContent = `Signing: ${word.toUpperCase()}`;
+        currentWord.style.backgroundColor = '';
+    }
+    currentWord.style.display = 'block';
+
+    // Start playing (no waiting here; queue continues via ended handler logic elsewhere)
+    await smoothPlayer.playNow(videoUrl, { rateMultiplier: 1.0 });
+}
+
+async function displayVideoAndWait(videoUrl, label, isLetter) {
+    const placeholder = videoContainer.querySelector('.video-placeholder');
+    if (placeholder) placeholder.style.display = 'none';
+
+    currentWord.textContent = label;
+    if (isLetter) currentWord.style.backgroundColor = '#f39c12';
+
+    await smoothPlayer.playNow(videoUrl, { rateMultiplier: 1.2 });
+    await smoothPlayer.waitForEndOrError();
+}
+
+// --------------------------
+// Update VIDEO EVENT HANDLERS section
+// --------------------------
+// IMPORTANT: remove old handlers that were attached to `aslVideo`
+// and attach them to BOTH videos, since either can be active.
+
+function onAnyVideoEnded() {
+    if (!isFingerspelling) {
+        playNextVideo();
+    }
+}
+
+function onAnyVideoError(e) {
+    console.error('Video error:', e);
+    if (!isFingerspelling) {
+        updateStatus('⚠️ Video failed to load', 'warning');
+        playNextVideo();
+    }
+}
+
+[aslVideoA, aslVideoB].forEach(v => {
+    v.addEventListener('ended', onAnyVideoEnded);
+    v.addEventListener('error', onAnyVideoError);
+});
+
+// Also update playbackSpeed handling:
+playbackSpeed.addEventListener('change', (e) => {
+    const rate = parseFloat(e.target.value);
+    aslVideoA.playbackRate = rate;
+    aslVideoB.playbackRate = rate;
+});
+
+// --------------------------
 // SPEECH RECOGNITION SETUP
 // --------------------------
 function initializeSpeechRecognition() {
@@ -87,7 +244,7 @@ function initializeSpeechRecognition() {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
-    
+
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
@@ -104,11 +261,11 @@ function initializeSpeechRecognition() {
         let finalTranscript = '';
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
+            const t = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-                finalTranscript += transcript + ' ';
+                finalTranscript += t + ' ';
             } else {
-                interimTranscript += transcript;
+                interimTranscript += t;
             }
         }
 
@@ -183,16 +340,16 @@ function clearTranscript() {
 async function startDemo() {
     updateStatus('🎬 Demo mode active...', 'demo');
     stopListening();
-    
+
     addToTranscript(DEMO_TEXT);
     await processText(DEMO_TEXT);
-    
+
     updateStatus('✅ Demo complete', 'success');
 }
 
 function downloadTranscript() {
     const text = transcript.innerText.replace('Spoken words will appear here...', '').trim();
-    
+
     if (!text) {
         updateStatus('⚠️ Nothing to download', 'warning');
         return;
@@ -216,9 +373,7 @@ function downloadTranscript() {
 // --------------------------
 function addToTranscript(text) {
     const placeholder = transcript.querySelector('.placeholder');
-    if (placeholder) {
-        placeholder.remove();
-    }
+    if (placeholder) placeholder.remove();
 
     const words = text.trim().split(/\s+/);
     wordsRecognized += words.length;
@@ -235,10 +390,8 @@ function addToTranscript(text) {
 // TEXT PROCESSING & ASL TRANSLATION
 // --------------------------
 async function processText(text) {
-    // Show the original text
     currentSentence.textContent = text;
-    
-    // Clean and split text into words
+
     const words = text
         .toLowerCase()
         .replace(/[^\w\s]/g, '')
@@ -247,16 +400,12 @@ async function processText(text) {
 
     const missingWordsList = [];
 
-    // Check each word and queue for video playback
     for (const word of words) {
         try {
             const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(word)}`);
-            
             if (response.ok) {
-                // Word has a direct ASL sign
                 videoQueue.push({ type: 'word', value: word });
             } else {
-                // Word not found - will be fingerspelled
                 console.log(`Word "${word}" not in library - will fingerspell`);
                 missingWordsList.push(word);
                 videoQueue.push({ type: 'fingerspell', value: word });
@@ -268,16 +417,14 @@ async function processText(text) {
         }
     }
 
-    // Display missing words that will be fingerspelled
     if (missingWordsList.length > 0) {
         missingWords.textContent = missingWordsList.join(', ');
-        missingWords.style.color = '#e67e22'; // Orange for fingerspelling
+        missingWords.style.color = '#e67e22';
     } else {
         missingWords.textContent = 'None';
-        missingWords.style.color = '#27ae60'; // Green for all found
+        missingWords.style.color = '#27ae60';
     }
 
-    // Start playing videos if not already playing
     if (!isPlayingVideo) {
         playNextVideo();
     }
@@ -299,10 +446,8 @@ async function playNextVideo() {
     const item = videoQueue.shift();
 
     if (item.type === 'word') {
-        // Play full word sign
         await playWordSign(item.value);
     } else if (item.type === 'fingerspell') {
-        // Fingerspell the word letter by letter
         await fingerspellWord(item.value);
     }
 }
@@ -316,9 +461,10 @@ async function playWordSign(word) {
             displayVideo(data.video_url, word, false);
             signsPlayed++;
             updateStats();
+            // Continue when the video ends via the global 'ended' handler
         } else {
             console.warn(`No ASL sign found for: ${word}`);
-            playNextVideo(); // Continue to next item
+            playNextVideo();
         }
     } catch (error) {
         console.error(`Error fetching ASL for "${word}":`, error);
@@ -330,57 +476,56 @@ async function playWordSign(word) {
 async function fingerspellWord(word) {
     console.log(`Fingerspelling word: ${word}`);
     isFingerspelling = true;
-    
-    // Show fingerspelling indicator
+
     currentWord.textContent = `Fingerspelling: ${word.toUpperCase()}`;
-    currentWord.style.backgroundColor = '#f39c12'; // Orange background
-    
+    currentWord.style.backgroundColor = '#f39c12';
+
     const letters = word.split('');
-    
+
     for (let i = 0; i < letters.length; i++) {
-        const letter = letters[i].toLowerCase();
-        
+        const letterRaw = letters[i].toLowerCase();
+
+        // Only attempt a-z letters; skip digits/underscores etc.
+        if (!/^[a-z]$/.test(letterRaw)) {
+            await showLetterPlaceholder(letters[i].toUpperCase(), 600);
+            continue;
+        }
+
         try {
-            const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(letter)}`);
+            const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(letterRaw)}`);
             const data = await response.json();
 
             if (response.ok) {
-                // Display each letter with brief pause
-                await displayVideoAndWait(data.video_url, `${letter.toUpperCase()} (${i+1}/${letters.length})`, true);
+                await displayVideoAndWait(data.video_url, `${letterRaw.toUpperCase()} (${i + 1}/${letters.length})`, true);
                 signsPlayed++;
                 updateStats();
             } else {
-                console.warn(`No fingerspelling sign for letter: ${letter}`);
-                // Show placeholder for missing letter
-                await showLetterPlaceholder(letter.toUpperCase(), 1000);
+                console.warn(`No fingerspelling sign for letter: ${letterRaw}`);
+                await showLetterPlaceholder(letterRaw.toUpperCase(), 800);
             }
         } catch (error) {
-            console.error(`Error fetching fingerspelling for "${letter}":`, error);
-            await showLetterPlaceholder(letter.toUpperCase(), 1000);
+            console.error(`Error fetching fingerspelling for "${letterRaw}":`, error);
+            await showLetterPlaceholder(letterRaw.toUpperCase(), 800);
         }
     }
-    
-    // Finished fingerspelling this word
+
     isFingerspelling = false;
     currentWord.style.backgroundColor = '';
-    
-    // Continue with next item in queue
+
+    // Continue with next queued word
     playNextVideo();
 }
 
 function displayVideo(videoUrl, word, isLetter) {
     const fullUrl = `${API_BASE_URL}${videoUrl}`;
-    
-    // Hide placeholder, show video
+
     const placeholder = videoContainer.querySelector('.video-placeholder');
-    if (placeholder) {
-        placeholder.style.display = 'none';
-    }
-    
+    if (placeholder) placeholder.style.display = 'none';
+
     aslVideo.src = fullUrl;
     aslVideo.style.display = 'block';
     aslVideo.playbackRate = parseFloat(playbackSpeed.value);
-    
+
     if (isLetter) {
         currentWord.textContent = `Fingerspelling: ${word}`;
         currentWord.style.backgroundColor = '#f39c12';
@@ -389,10 +534,9 @@ function displayVideo(videoUrl, word, isLetter) {
         currentWord.style.backgroundColor = '';
     }
     currentWord.style.display = 'block';
-    
-    // Auto-play if setting is enabled
+
     if (autoPlay.checked) {
-        aslVideo.play();
+        aslVideo.play().catch(err => console.error('Video play error:', err));
     }
 }
 
@@ -400,37 +544,42 @@ function displayVideo(videoUrl, word, isLetter) {
 function displayVideoAndWait(videoUrl, label, isLetter) {
     return new Promise((resolve) => {
         const fullUrl = `${API_BASE_URL}${videoUrl}`;
-        
+
         const placeholder = videoContainer.querySelector('.video-placeholder');
-        if (placeholder) {
-            placeholder.style.display = 'none';
-        }
-        
+        if (placeholder) placeholder.style.display = 'none';
+
+        // Configure video
+        aslVideo.pause();
+        aslVideo.currentTime = 0;
         aslVideo.src = fullUrl;
         aslVideo.style.display = 'block';
-        aslVideo.playbackRate = parseFloat(playbackSpeed.value) * 1.2; // Slightly faster for fingerspelling
-        
+        aslVideo.playbackRate = parseFloat(playbackSpeed.value) * 1.2;
+
         currentWord.textContent = label;
-        if (isLetter) {
-            currentWord.style.backgroundColor = '#f39c12';
-        }
-        
-        // Remove old event listeners
-        const newVideo = aslVideo.cloneNode(true);
-        aslVideo.parentNode.replaceChild(newVideo, aslVideo);
-        Object.assign(aslVideo, newVideo);
-        
-        aslVideo.onended = () => {
+        if (isLetter) currentWord.style.backgroundColor = '#f39c12';
+
+        const cleanup = () => {
+            aslVideo.removeEventListener('ended', onEnded);
+            aslVideo.removeEventListener('error', onError);
+        };
+
+        const onEnded = () => {
+            cleanup();
             resolve();
         };
-        
-        aslVideo.onerror = () => {
-            console.error('Video playback error');
+
+        const onError = () => {
+            console.error('Video playback error (letter)');
+            cleanup();
             resolve();
         };
-        
+
+        aslVideo.addEventListener('ended', onEnded, { once: true });
+        aslVideo.addEventListener('error', onError, { once: true });
+
         aslVideo.play().catch(err => {
-            console.error('Video play error:', err);
+            console.error('Video play error (letter):', err);
+            cleanup();
             resolve();
         });
     });
@@ -440,7 +589,7 @@ function displayVideoAndWait(videoUrl, label, isLetter) {
 function showLetterPlaceholder(letter, duration) {
     return new Promise((resolve) => {
         currentWord.textContent = `Letter: ${letter} (No video available)`;
-        currentWord.style.backgroundColor = '#e74c3c'; // Red for missing
+        currentWord.style.backgroundColor = '#e74c3c';
         setTimeout(resolve, duration);
     });
 }
@@ -486,7 +635,7 @@ async function checkServerHealth() {
     try {
         const response = await fetch(`${API_BASE_URL}/health`);
         const data = await response.json();
-        
+
         console.log('✅ Server Status:', data);
         totalSigns.textContent = data.total_signs || 0;
         updateStatus('✅ Connected to server', 'success');
@@ -524,23 +673,17 @@ function updateDarkModeIcon() {
 // SETTINGS MANAGEMENT
 // --------------------------
 function loadSettings() {
-    // Dark mode
     if (localStorage.getItem('darkMode') === 'true') {
         document.body.classList.add('dark-mode');
     }
 
-    // Text size
     const savedTextSize = localStorage.getItem('textSize') || 'medium';
     textSize.value = savedTextSize;
     transcript.style.fontSize = getFontSize(savedTextSize);
 
-    // Auto-play
     autoPlay.checked = localStorage.getItem('autoPlay') !== 'false';
-
-    // Highlight words
     highlightWords.checked = localStorage.getItem('highlightWords') !== 'false';
 
-    // Show stats
     const statsVisible = localStorage.getItem('showStats') !== 'false';
     showStats.checked = statsVisible;
     document.querySelector('.stats-bar').style.display = statsVisible ? 'flex' : 'none';
@@ -552,7 +695,6 @@ function saveSettings() {
     localStorage.setItem('highlightWords', highlightWords.checked);
     localStorage.setItem('showStats', showStats.checked);
 
-    // Apply settings
     transcript.style.fontSize = getFontSize(textSize.value);
     document.querySelector('.stats-bar').style.display = showStats.checked ? 'flex' : 'none';
 
@@ -593,27 +735,22 @@ function closeModal(modal) {
 // EVENT LISTENERS
 // --------------------------
 function setupEventListeners() {
-    // Control buttons
     startBtn.addEventListener('click', startListening);
     stopBtn.addEventListener('click', stopListening);
     demoBtn.addEventListener('click', startDemo);
     clearBtn.addEventListener('click', clearTranscript);
     downloadBtn.addEventListener('click', downloadTranscript);
-    
-    // UI buttons
+
     darkModeToggle.addEventListener('click', toggleDarkMode);
-    
-    // Help modal
+
     helpBtn.addEventListener('click', () => openModal(helpModal));
     helpModal.querySelector('.modal-close').addEventListener('click', () => closeModal(helpModal));
-    
-    // Settings modal
+
     settingsBtn.addEventListener('click', () => openModal(settingsModal));
     settingsModal.querySelector('.modal-close').addEventListener('click', () => closeModal(settingsModal));
     saveSettingsBtn.addEventListener('click', saveSettings);
     resetSettingsBtn.addEventListener('click', resetSettings);
-    
-    // Close modals on background click
+
     [helpModal, settingsModal].forEach(modal => {
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
@@ -628,30 +765,24 @@ function setupEventListeners() {
 // --------------------------
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-        // Ignore if typing in input field
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            return;
-        }
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-        switch(e.key.toLowerCase()) {
-            case ' ': // Space - Start/Stop
+        switch (e.key.toLowerCase()) {
+            case ' ':
                 e.preventDefault();
-                if (isListening) {
-                    stopListening();
-                } else {
-                    startListening();
-                }
+                if (isListening) stopListening();
+                else startListening();
                 break;
-            case 'escape': // Esc - Clear
+            case 'escape':
                 clearTranscript();
                 break;
-            case 'd': // D - Demo
+            case 'd':
                 startDemo();
                 break;
-            case 's': // S - Save/Download
+            case 's':
                 downloadTranscript();
                 break;
-            case '?': // ? - Help
+            case '?':
                 openModal(helpModal);
                 break;
         }

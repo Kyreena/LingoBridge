@@ -332,10 +332,21 @@ body {
 }
 
 .asl-video {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: auto;
+    object-fit: contain;
     display: none;
     border-radius: 8px;
+
+    opacity: 0;
+    transition: opacity 160ms linear; /* Smooth fade-in for video */
+    background: black;
+}
+
+.asl-video.is-active {
+    opacity: 1;
 }
 
 .asl-video[src] {
