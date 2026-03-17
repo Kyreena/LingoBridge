@@ -3,6 +3,7 @@ import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
 DB_FILENAME = "lingobridge.db"
 
@@ -43,7 +44,7 @@ def end_session(db_path: str, session_id: str) -> None:
         )
         conn.commit()
 
-def log_event(db_path: str, session_id: str, event_type: str, payload: dict | None = None) -> None:
+def log_event(db_path: str, session_id: str, event_type: str, payload: Optional[dict] = None) -> None:
     payload_str = json.dumps(payload or {}, ensure_ascii=False)
     with connect(db_path) as conn:
         conn.execute(
@@ -51,7 +52,7 @@ def log_event(db_path: str, session_id: str, event_type: str, payload: dict | No
             (session_id, _now_iso(), event_type, payload_str),
         )
         conn.commit()
-
+        
 def bump_counter(db_path: str, session_id: str, field: str, amount: int = 1) -> None:
     allowed = {"words_recognized", "signs_played", "fingerspelled_words", "pauses", "resumes"}
     if field not in allowed:

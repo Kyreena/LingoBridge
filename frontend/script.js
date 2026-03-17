@@ -12,6 +12,28 @@ const DEMO_TEXT = "Hello my name is Halima. I love learning sign language. Thank
 const COMMIT_SILENCE_MS = 700;     // commit after ~0.7s of silence
 const MIN_WORDS_PER_CHUNK = 2;     // avoid committing tiny fragments too often
 
+// Backpressure / classroom tuning
+const MAX_QUEUE_ITEMS = 18;          // hard ceiling on queued items
+const SOFT_QUEUE_ITEMS = 12;         // start dropping less-important items above this
+const MAX_SIGNS_PER_CHUNK = 6;       // limit new items added per committed chunk
+
+// Very small stopword list (safe starter). You can expand later.
+const STOPWORDS = new Set([
+  "the","a","an","and","or","but","so",
+  "to","of","in","on","at","for","from","with","as",
+  "is","am","are","was","were","be","been","being",
+  "it","this","that","these","those",
+  "i","you","he","she","we","they","me","him","her","us","them",
+  "my","your","his","her","our","their",
+  "do","does","did","doing",
+  "have","has","had",
+  "not","no","yes",
+  "um","uh"
+]);
+
+function isStopword(w) {
+  return STOPWORDS.has(w);
+}
 // --------------------------
 // DOM ELEMENTS
 // --------------------------
@@ -565,11 +587,21 @@ async function processText(text) {
   // If paused, do not translate
   if (isPaused) return;
 
-  const words = text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, '')
-    .split(/\s+/)
-    .filter(word => word.length > 0);
+  let words = text
+  .toLowerCase()
+  .replace(/[^\w\s]/g, '')
+  .split(/\s+/)
+  .filter(w => w.length > 0);
+
+// 1) remove stopwords first (keeps meaning better under time pressure)
+words = words.filter(w => !isStopword(w));
+
+// 2) simple priority: longer words first (often more semantic)
+// (you can swap to frequency-based later)
+words.sort((a, b) => b.length - a.length);
+
+// 3) limit how many new signs we add for this chunk
+words = words.slice(0, MAX_SIGNS_PER_CHUNK);
 
   const missingWordsList = [];
 
@@ -599,10 +631,38 @@ async function processText(text) {
       missingWords.style.color = '#27ae60';
     }
   }
-
+  // Backpressure: if queue is growing too large, drop older/less-meaningful items.
+  // Strategy: remove items from the FRONT (oldest) until we're under SOFT_QUEUE_ITEMS.
+if (videoQueue.length > MAX_QUEUE_ITEMS) {
+  // hard reset to newest items
+  videoQueue = videoQueue.slice(videoQueue.length - SOFT_QUEUE_ITEMS);
+  updateStatus('⚡ Catching up (skipping older signs to stay real-time)', 'warning');
+} else if (videoQueue.length > SOFT_QUEUE_ITEMS) {
+  // soft trim a little (drop a few oldest)
+  const trimCount = videoQueue.length - SOFT_QUEUE_ITEMS;
+  videoQueue.splice(0, trimCount);
+}
   if (!isPlayingVideo) {
     playNextVideo();
   }
+
+  function applyAdaptiveSpeed() {
+  // Only adjust if playbackSpeed select exists
+  if (!playbackSpeed) return;
+
+  const q = videoQueue.length;
+
+  // if user manually chose a speed, you might not want to override it.
+  // If you DO want auto override, keep as-is. If not, tell me and we’ll gate it.
+  if (q > 12) playbackSpeed.value = "2.5";
+  else if (q > 6) playbackSpeed.value = "2";
+  else playbackSpeed.value = "1.75";
+
+  const rate = parseFloat(playbackSpeed.value || "1");
+  smoothPlayer.updateRates(rate);
+}
+
+applyAdaptiveSpeed();
 }
 
 // --------------------------
