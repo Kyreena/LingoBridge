@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LingoBridge Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>LingoBridge Dashboard</h1>
+    <p>Session logging & analytics (privacy-safe)</p>
+    <div class="header-actions">
+      <a class="btn btn-secondary" href="/">← Back</a>
+    </div>
+  </header>
+
+  <div class="app">
+    <main role="main">
+      <section class="card">
+        <h2>Summary</h2>
+        <div id="summary" class="stats-bar" style="display:flex;"></div>
+      </section>
+
+      <section class="card">
+        <h2>Top Missing Words</h2>
+        <ul id="topMissingWords"></ul>
+      </section>
+
+      <section class="card">
+        <h2>Recent Sessions</h2>
+        <div style="overflow:auto;">
+          <table class="table" id="sessionsTable">
+            <thead>
+              <tr>
+                <th>Started</th>
+                <th>Ended</th>
+                <th>Mode</th>
+                <th>Words</th>
+                <th>Signs</th>
+                <th>Fingerspelled</th>
+                <th>Pauses</th>
+                <th>Resumes</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p style="opacity:0.8; margin-top: 12px;">
+          Tip: run a demo or start/stop listening to generate sessions.
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

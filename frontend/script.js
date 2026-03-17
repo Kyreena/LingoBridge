@@ -6,7 +6,7 @@
 // CONFIGURATION
 // --------------------------
 const API_BASE_URL = 'http://localhost:5000';
-const DEMO_TEXT = "Hello my name is John. I love learning sign language. Thank you for watching.";
+const DEMO_TEXT = "Hello my name is Halima. I love learning sign language. Thank you for watching.";
 
 // Chunking tuning (classroom-friendly defaults)
 const COMMIT_SILENCE_MS = 700;     // commit after ~0.7s of silence
@@ -489,9 +489,15 @@ function clearTranscript() {
 async function startDemo() {
   updateStatus('🎬 Demo mode active...', 'demo');
 
-  // Demo should not require mic
-  // Clear state and run demo chunks in sequence
-  pauseInterpretation();
+  // Stop mic listening if it was running, but DO NOT pause interpretation
+  stopListening();
+  isPaused = false;
+
+  // Reset playback/queue state for a clean demo run
+  videoQueue = [];
+  isPlayingVideo = false;
+  isFingerspelling = false;
+
   clearTranscript();
 
   // Commit demo in chunks so it behaves like classroom streaming
