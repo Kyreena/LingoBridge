@@ -450,7 +450,6 @@ function pauseInterpretation() {
     try { recognition.stop(); } catch {}
   }
 
-  // Clear queues + stop playback
   clearSilenceCommit();
   interimBuffer = '';
   videoQueue = [];
@@ -461,7 +460,6 @@ function pauseInterpretation() {
 
   updateStatus('⏸️ Paused (not listening)', 'idle');
 
-  // UI states
   startBtn.disabled = false;
   stopBtn.disabled = true;
 
@@ -471,17 +469,33 @@ function pauseInterpretation() {
 
 function resumeInterpretation() {
   if (!isPaused) return;
-  isPaused = false;
-
-  // Clear queued signs on resume (your choice)
+  isPaused = false;      // ← Must be FIRST
+  isListening = true;    // ← Must be SECOND
+  
+  // Clear state
   videoQueue = [];
   isPlayingVideo = false;
   isFingerspelling = false;
-
+  
   updateStatus('▶️ Resuming...', 'listening');
-
-  startListening();
-
+  
+  // Start recognition with error handling
+  if (recognition) {
+    try {
+      recognition.start();  
+    } catch (error) {
+      if (error.name !== 'InvalidStateError') {
+        console.error('Resume failed:', error);
+        isListening = false;
+        isPaused = true;
+        return;
+      }
+    }
+  }
+  
+  // Update button states
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
   if (pauseBtn) pauseBtn.disabled = false;
   if (resumeBtn) resumeBtn.disabled = true;
 }
@@ -583,6 +597,21 @@ function addTranscriptChunk(text) {
 // --------------------------
 // TEXT PROCESSING & ASL TRANSLATION
 // --------------------------
+function applyAdaptiveSpeed() {
+  // Only adjust if playbackSpeed select exists
+  if (!playbackSpeed) return;
+
+  const q = videoQueue.length;
+
+  // These values MUST exist as <option> values in index.html
+  if (q > 12) playbackSpeed.value = "2.5";
+  else if (q > 6) playbackSpeed.value = "3";
+  else playbackSpeed.value = "1.75";
+
+  const rate = parseFloat(playbackSpeed.value || "1");
+  smoothPlayer.updateRates(rate);
+}
+
 async function processText(text) {
   // If paused, do not translate
   if (isPaused) return;
@@ -642,27 +671,12 @@ if (videoQueue.length > MAX_QUEUE_ITEMS) {
   const trimCount = videoQueue.length - SOFT_QUEUE_ITEMS;
   videoQueue.splice(0, trimCount);
 }
+//Apply adaptive speed based on current queue length
+applyAdaptiveSpeed();
+
   if (!isPlayingVideo) {
     playNextVideo();
   }
-
-  function applyAdaptiveSpeed() {
-  // Only adjust if playbackSpeed select exists
-  if (!playbackSpeed) return;
-
-  const q = videoQueue.length;
-
-  // if user manually chose a speed, you might not want to override it.
-  // If you DO want auto override, keep as-is. If not, tell me and we’ll gate it.
-  if (q > 12) playbackSpeed.value = "2.5";
-  else if (q > 6) playbackSpeed.value = "2";
-  else playbackSpeed.value = "1.75";
-
-  const rate = parseFloat(playbackSpeed.value || "1");
-  smoothPlayer.updateRates(rate);
-}
-
-applyAdaptiveSpeed();
 }
 
 // --------------------------
