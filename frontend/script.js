@@ -103,16 +103,16 @@ let recognition = null;
 let isListening = false;
 let isPaused = false;
 
-const item = videoQueue.shift();
-let currentQueueItem = item;
-let pauseMidItem = false;
-
 let wordsRecognized = 0;
 let signsPlayed = 0;
 
 let videoQueue = [];
 let isPlayingVideo = false;
 let isFingerspelling = false;
+
+// Track what item we are currently playing so pause/resume can resume mid-video.
+let currentQueueItem = null;
+let pausedMidItem = false;
 
 // Speech buffering
 let interimBuffer = '';
@@ -190,6 +190,7 @@ const smoothPlayer = (() => {
 
     await prime(url, rate);
 
+    // swap
     const prev = active;
     active = inactive;
     inactive = prev;
@@ -236,32 +237,41 @@ const smoothPlayer = (() => {
   }
 
   function pauseActive() {
-  if (active) active.pause();
+    if (active) active.pause();
   }
-  
+
   async function resumeActive() {
-  if (!active) return false;
-  if (active.src && active.paused) {
-    try {
-      await active.play();
-      return true;
-    } catch (e) {
-      console.error("Failed to resume active video:", e);
-      return false;
+    if (!active) return false;
+    if (active.src && active.paused) {
+      try {
+        await active.play();
+        return true;
+      } catch (e) {
+        console.error("Failed to resume active video:", e);
+        return false;
+      }
     }
+    return false;
   }
-  return false;
-}
 
-function hasActiveSrc() {
-  return !!(active && active.src);
-}
+  function hasActiveSrc() {
+    return !!(active && active.src);
+  }
 
-function isActivePaused() {
-  return !!(active && active.paused);
-}
+  function isActivePaused() {
+    return !!(active && active.paused);
+  }
 
-  return { playNow, waitForEndOrError, updateRates, stopAll, pauseActive, resumeActive, hasActiveSrc, isActivePaused};
+  return {
+    playNow,
+    waitForEndOrError,
+    updateRates,
+    stopAll,
+    pauseActive,
+    resumeActive,
+    hasActiveSrc,
+    isActivePaused
+  };
 })();
 
 // --------------------------
@@ -538,6 +548,7 @@ function pauseInterpretation() {
   if (isPaused) return;
   isPaused = true;
 
+  // Stop recognition (no new transcript while paused)
   if (recognition) {
     isListening = false;
     try { recognition.stop(); } catch {}
@@ -547,11 +558,10 @@ function pauseInterpretation() {
   interimBuffer = '';
   sentenceBuffer = '';
 
-  videoQueue = [];
-  isPlayingVideo = false;
-  isFingerspelling = false;
-
-  smoothPlayer.stopAll();
+  // IMPORTANT: do NOT clear videoQueue here — we want to continue where we left off.
+  // If we're currently mid-video, pause it so we can resume later.
+  pausedMidItem = isPlayingVideo && smoothPlayer.hasActiveSrc() && !smoothPlayer.isActivePaused();
+  smoothPlayer.pauseActive();
 
   updateStatus('⏸️ Paused (not listening)', 'idle');
 
@@ -568,11 +578,6 @@ function resumeInterpretation() {
   isPaused = false;
   isListening = true;
 
-  // Clear playback state
-  videoQueue = [];
-  isPlayingVideo = false;
-  isFingerspelling = false;
-
   updateStatus('▶️ Resuming...', 'listening');
 
   if (!safeStartRecognition()) {
@@ -580,6 +585,21 @@ function resumeInterpretation() {
     isPaused = true;
     updateStatus('❌ Resume failed (mic could not restart)', 'error');
     return;
+  }
+
+  // If we paused mid-video, resume it so the ended-event chain continues
+  if (pausedMidItem) {
+    smoothPlayer.resumeActive().then((ok) => {
+      if (!ok) {
+        // fallback: continue with queue if video resume fails
+        playNextVideo();
+      }
+    });
+  } else if (isPlayingVideo) {
+    // If we think we were playing, ensure we keep going
+    playNextVideo();
+  } else if (!isPlayingVideo && videoQueue.length > 0) {
+    playNextVideo();
   }
 
   startBtn.disabled = true;
@@ -603,6 +623,9 @@ function clearTranscript() {
   videoQueue = [];
   isPlayingVideo = false;
   isFingerspelling = false;
+  currentQueueItem = null;
+  pausedMidItem = false;
+  smoothPlayer.stopAll();
 
   interimBuffer = '';
   sentenceBuffer = '';
@@ -623,6 +646,9 @@ async function startDemo() {
   videoQueue = [];
   isPlayingVideo = false;
   isFingerspelling = false;
+  currentQueueItem = null;
+  pausedMidItem = false;
+  smoothPlayer.stopAll();
 
   clearTranscript();
 
@@ -700,10 +726,10 @@ function getAdaptiveSignBudget() {
   const q = videoQueue.length;
 
   // Tweak thresholds as you observe real classroom behavior
-  if (q <= 2) return SIGN_BUDGET.high;      // almost caught up: sign more words
-  if (q <= 6) return SIGN_BUDGET.medium;    // normal: sign a lot
-  if (q <= 10) return SIGN_BUDGET.low;      // getting behind: sign fewer
-  return SIGN_BUDGET.min;                   // overloaded: minimum meaning to catch up
+  if (q <= 2) return SIGN_BUDGET.high;
+  if (q <= 6) return SIGN_BUDGET.medium;
+  if (q <= 10) return SIGN_BUDGET.low;
+  return SIGN_BUDGET.min;
 }
 
 function tokenizeInSpokenOrder(text) {
@@ -786,6 +812,7 @@ async function playNextVideo() {
   if (videoQueue.length === 0) {
     isPlayingVideo = false;
     isFingerspelling = false;
+    currentQueueItem = null;
     currentWord.textContent = '';
     currentWord.style.backgroundColor = '';
     return;
@@ -793,6 +820,8 @@ async function playNextVideo() {
 
   isPlayingVideo = true;
   const item = videoQueue.shift();
+  currentQueueItem = item;
+  pausedMidItem = false;
 
   if (item.type === 'word') {
     await playWordSign(item.value);
@@ -1049,4 +1078,4 @@ function setupKeyboardShortcuts() {
 // CONSOLE
 // --------------------------
 console.log('%c🌉 LingoBridge', 'font-size: 24px; font-weight: bold; color: #667eea;');
-console.log('%cReal-time Speech to ASL Translation System', 'font-size: 14px; color: #718096;');z
+console.log('%cReal-time Speech to ASL Translation System', 'font-size: 14px; color: #718096;');
