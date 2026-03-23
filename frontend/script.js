@@ -8,14 +8,28 @@
 const API_BASE_URL = 'http://localhost:5000';
 const DEMO_TEXT = "Hello my name is Halima. I love learning sign language. Thank you for watching.";
 
-// Chunking tuning (classroom-friendly defaults)
-const COMMIT_SILENCE_MS = 700;     // commit after ~0.7s of silence
-const MIN_WORDS_PER_CHUNK = 2;     // avoid committing tiny fragments too often
+// Silence timer (used only for fallback flushing when punctuation isn't coming through)
+const COMMIT_SILENCE_MS = 700;
+const MIN_WORDS_PER_CHUNK = 2;
 
 // Backpressure / classroom tuning
-const MAX_QUEUE_ITEMS = 18;          // hard ceiling on queued items
-const SOFT_QUEUE_ITEMS = 12;         // start dropping less-important items above this
-const MAX_SIGNS_PER_CHUNK = 6;       // limit new items added per committed chunk
+const MAX_QUEUE_ITEMS = 18;   // hard ceiling on queued items
+const SOFT_QUEUE_ITEMS = 12;  // start trimming above this
+
+// Sentence-aware buffering:
+// prefer committing only when we see . ! ?
+// but don't stall forever if user doesn't say punctuation
+const MAX_WORDS_WITHOUT_PUNCTUATION = 20;
+
+// Adaptive “sign budget” per committed sentence
+// (how many words from the sentence we will try to sign)
+const SIGN_BUDGET = {
+  // If queue is short, sign more to preserve meaning
+  high: 10,     // when queue is very short
+  medium: 8,    // when queue is moderate
+  low: 5,       // when queue is getting long
+  min: 3        // worst case when queue is overloaded
+};
 
 // Very small stopword list (safe starter). You can expand later.
 const STOPWORDS = new Set([
@@ -34,6 +48,7 @@ const STOPWORDS = new Set([
 function isStopword(w) {
   return STOPWORDS.has(w);
 }
+
 // --------------------------
 // DOM ELEMENTS
 // --------------------------
@@ -67,7 +82,7 @@ const wordCount = document.getElementById('wordCount');
 const signCount = document.getElementById('signCount');
 const totalSigns = document.getElementById('totalSigns');
 
-// Optional translation display (you can remove from HTML safely)
+// Optional translation display (safe to remove from HTML)
 const currentSentence = document.getElementById('currentSentence');
 const missingWords = document.getElementById('missingWords');
 
@@ -88,6 +103,10 @@ let recognition = null;
 let isListening = false;
 let isPaused = false;
 
+const item = videoQueue.shift();
+let currentQueueItem = item;
+let pauseMidItem = false;
+
 let wordsRecognized = 0;
 let signsPlayed = 0;
 
@@ -95,9 +114,12 @@ let videoQueue = [];
 let isPlayingVideo = false;
 let isFingerspelling = false;
 
-// Speech buffering/chunking
+// Speech buffering
 let interimBuffer = '';
 let silenceTimer = null;
+
+// Sentence buffer (committed on punctuation/fallback)
+let sentenceBuffer = '';
 
 // Lyrics highlighting
 let currentTranscriptLineEl = null;
@@ -113,13 +135,11 @@ window.addEventListener('load', async () => {
   setupKeyboardShortcuts();
   updateDarkModeIcon();
 
-  // A/B sanity check
   if (!aslVideoA || !aslVideoB) {
     console.error('Missing aslVideoA/aslVideoB. Fix index.html video IDs.');
     updateStatus('❌ Video elements missing (check HTML ids)', 'error');
   }
 
-  // Improve transcript container semantics for lyrics mode
   transcript.classList.add('transcript-lyrics');
 });
 
@@ -155,14 +175,12 @@ const smoothPlayer = (() => {
       const done = () => resolve();
       inactive.addEventListener('canplay', done, { once: true });
       inactive.addEventListener('loadeddata', done, { once: true });
-      setTimeout(resolve, 400); // safety
+      setTimeout(resolve, 400);
     });
   }
 
   async function playNow(videoUrl, opts = {}) {
     if (!ensureInit()) return;
-
-    // If paused, do not start new playback
     if (isPaused) return;
 
     const { rateMultiplier = 1.0 } = opts;
@@ -172,7 +190,6 @@ const smoothPlayer = (() => {
 
     await prime(url, rate);
 
-    // swap
     const prev = active;
     active = inactive;
     inactive = prev;
@@ -218,7 +235,33 @@ const smoothPlayer = (() => {
     if (aslVideoB) aslVideoB.pause();
   }
 
-  return { playNow, waitForEndOrError, updateRates, stopAll };
+  function pauseActive() {
+  if (active) active.pause();
+  }
+  
+  async function resumeActive() {
+  if (!active) return false;
+  if (active.src && active.paused) {
+    try {
+      await active.play();
+      return true;
+    } catch (e) {
+      console.error("Failed to resume active video:", e);
+      return false;
+    }
+  }
+  return false;
+}
+
+function hasActiveSrc() {
+  return !!(active && active.src);
+}
+
+function isActivePaused() {
+  return !!(active && active.paused);
+}
+
+  return { playNow, waitForEndOrError, updateRates, stopAll, pauseActive, resumeActive, hasActiveSrc, isActivePaused};
 })();
 
 // --------------------------
@@ -255,12 +298,8 @@ async function displayVideoAndWait(videoUrl, label, isLetter) {
 // VIDEO EVENT HANDLERS
 // --------------------------
 function onAnyVideoEnded() {
-  // if paused, do nothing
   if (isPaused) return;
-
-  if (!isFingerspelling) {
-    playNextVideo();
-  }
+  if (!isFingerspelling) playNextVideo();
 }
 
 function onAnyVideoError(e) {
@@ -308,7 +347,6 @@ function initializeSpeechRecognition() {
     startBtn.disabled = true;
     stopBtn.disabled = false;
 
-    // Pause/Resume controls
     if (pauseBtn) pauseBtn.disabled = false;
     if (resumeBtn) resumeBtn.disabled = true;
   };
@@ -325,17 +363,16 @@ function initializeSpeechRecognition() {
       else interimTranscript += t;
     }
 
-    // Track interim buffer for silence-based committing
     if (interimTranscript) {
       interimBuffer = interimTranscript;
-      scheduleSilenceCommit();
+      scheduleSilenceFlush();
     }
 
     if (finalTranscript.trim()) {
-      // commit immediately on final
-      commitChunk(finalTranscript);
+      sentenceBuffer += (sentenceBuffer ? ' ' : '') + finalTranscript.trim();
       interimBuffer = '';
-      clearSilenceCommit();
+      clearSilenceFlush();
+      flushCompleteSentencesFromBuffer();
     }
   };
 
@@ -347,58 +384,120 @@ function initializeSpeechRecognition() {
   };
 
   recognition.onend = () => {
-    // If user explicitly stopped or paused, do not auto-restart here.
     if (isPaused) return;
     if (!isListening) return;
 
-    // Restart if it ends unexpectedly while listening
     try {
       recognition.start();
     } catch (e) {
-      stopListening();
+      // rebuild once
+      try {
+        initializeSpeechRecognition();
+        recognition.start();
+      } catch {
+        stopListening();
+      }
     }
   };
 }
 
+function safeStartRecognition() {
+  if (!recognition) initializeSpeechRecognition();
+
+  try {
+    recognition.start();
+    return true;
+  } catch (err) {
+    if (err && err.name === 'InvalidStateError') {
+      try {
+        initializeSpeechRecognition();
+        recognition.start();
+        return true;
+      } catch (e2) {
+        console.error('Failed to restart recognition after rebuild:', e2);
+        return false;
+      }
+    }
+    console.error('Error starting recognition:', err);
+    return false;
+  }
+}
+
 // --------------------------
-// CHUNK COMMITTING (near real-time)
+// SENTENCE BUFFERING / COMMITTING
 // --------------------------
-function scheduleSilenceCommit() {
-  clearSilenceCommit();
+function splitIntoSentencesWithDelimiters(text) {
+  const complete = [];
+  let remainder = text;
+
+  const re = /([^.!?]*[.!?]+)/g;
+  let match;
+  let lastIndex = 0;
+
+  while ((match = re.exec(text)) !== null) {
+    const sentence = match[0].trim();
+    if (sentence) complete.push(sentence);
+    lastIndex = re.lastIndex;
+  }
+
+  remainder = text.slice(lastIndex).trim();
+  return { complete, remainder };
+}
+
+function flushCompleteSentencesFromBuffer() {
+  const buf = sentenceBuffer.trim();
+  if (!buf) return;
+
+  const { complete, remainder } = splitIntoSentencesWithDelimiters(buf);
+
+  // Commit full sentences in order
+  complete.forEach(s => commitChunk(s));
+
+  sentenceBuffer = remainder;
+
+  // Fallback: if no punctuation is coming through, commit after buffer becomes long
+  const wc = sentenceBuffer.split(/\s+/).filter(Boolean).length;
+  if (wc >= MAX_WORDS_WITHOUT_PUNCTUATION) {
+    const forced = sentenceBuffer.trim();
+    sentenceBuffer = '';
+    if (forced) commitChunk(forced);
+  }
+}
+
+function scheduleSilenceFlush() {
+  clearSilenceFlush();
   silenceTimer = setTimeout(() => {
     if (isPaused) return;
-    const text = interimBuffer.trim();
-    if (text) {
-      commitChunk(text);
-      interimBuffer = '';
+    if (sentenceBuffer && sentenceBuffer.trim()) {
+      flushCompleteSentencesFromBuffer();
     }
   }, COMMIT_SILENCE_MS);
 }
 
-function clearSilenceCommit() {
+function clearSilenceFlush() {
   if (silenceTimer) {
     clearTimeout(silenceTimer);
     silenceTimer = null;
   }
 }
 
+// --------------------------
+// CHUNK COMMITTING
+// --------------------------
 async function commitChunk(text) {
-  const cleaned = text.trim();
+  const cleaned = (text || '').trim();
   if (!cleaned) return;
 
-  // Avoid committing very tiny 1-word junk too frequently
   const wordLen = cleaned.split(/\s+/).filter(Boolean).length;
   if (wordLen < MIN_WORDS_PER_CHUNK && cleaned.length < 10) {
-    // still show it in transcript, but you can change this behavior if you want
+    // keep behavior as-is (still allow commit)
   }
 
-  // Lyrics-style transcript: append and highlight this chunk
   addTranscriptChunk(cleaned);
 
-  // Optional bottom section (safe if removed)
+  // Optional section below (safe if removed from HTML)
   if (currentSentence) currentSentence.textContent += (currentSentence.textContent ? ' ' : '') + cleaned;
 
-  // Translate + queue ASL for this chunk
   await processText(cleaned);
 }
 
@@ -406,19 +505,13 @@ async function commitChunk(text) {
 // CONTROL FUNCTIONS
 // --------------------------
 function startListening() {
-  if (!recognition) {
-    updateStatus('❌ Speech recognition not available', 'error');
-    return;
-  }
-
   isPaused = false;
+  isListening = true;
 
-  try {
-    recognition.start();
-    isListening = true;
-  } catch (error) {
-    console.error('Error starting recognition:', error);
+  if (!safeStartRecognition()) {
+    isListening = false;
     updateStatus('❌ Failed to start listening', 'error');
+    return;
   }
 }
 
@@ -428,8 +521,9 @@ function stopListening() {
     try { recognition.stop(); } catch {}
   }
 
-  clearSilenceCommit();
+  clearSilenceFlush();
   interimBuffer = '';
+  sentenceBuffer = '';
 
   updateStatus('⏹️ Stopped listening', 'idle');
 
@@ -444,14 +538,15 @@ function pauseInterpretation() {
   if (isPaused) return;
   isPaused = true;
 
-  // Stop recognition (prevents random noise transcription)
   if (recognition) {
     isListening = false;
     try { recognition.stop(); } catch {}
   }
 
-  clearSilenceCommit();
+  clearSilenceFlush();
   interimBuffer = '';
+  sentenceBuffer = '';
+
   videoQueue = [];
   isPlayingVideo = false;
   isFingerspelling = false;
@@ -469,31 +564,24 @@ function pauseInterpretation() {
 
 function resumeInterpretation() {
   if (!isPaused) return;
-  isPaused = false;      // ← Must be FIRST
-  isListening = true;    // ← Must be SECOND
-  
-  // Clear state
+
+  isPaused = false;
+  isListening = true;
+
+  // Clear playback state
   videoQueue = [];
   isPlayingVideo = false;
   isFingerspelling = false;
-  
+
   updateStatus('▶️ Resuming...', 'listening');
-  
-  // Start recognition with error handling
-  if (recognition) {
-    try {
-      recognition.start();  
-    } catch (error) {
-      if (error.name !== 'InvalidStateError') {
-        console.error('Resume failed:', error);
-        isListening = false;
-        isPaused = true;
-        return;
-      }
-    }
+
+  if (!safeStartRecognition()) {
+    isListening = false;
+    isPaused = true;
+    updateStatus('❌ Resume failed (mic could not restart)', 'error');
+    return;
   }
-  
-  // Update button states
+
   startBtn.disabled = true;
   stopBtn.disabled = false;
   if (pauseBtn) pauseBtn.disabled = false;
@@ -516,6 +604,10 @@ function clearTranscript() {
   isPlayingVideo = false;
   isFingerspelling = false;
 
+  interimBuffer = '';
+  sentenceBuffer = '';
+  clearSilenceFlush();
+
   currentTranscriptLineEl = null;
 
   updateStats();
@@ -525,19 +617,16 @@ function clearTranscript() {
 async function startDemo() {
   updateStatus('🎬 Demo mode active...', 'demo');
 
-  // Stop mic listening if it was running, but DO NOT pause interpretation
   stopListening();
   isPaused = false;
 
-  // Reset playback/queue state for a clean demo run
   videoQueue = [];
   isPlayingVideo = false;
   isFingerspelling = false;
 
   clearTranscript();
 
-  // Commit demo in chunks so it behaves like classroom streaming
-  const parts = DEMO_TEXT.split(/[.?!]/).map(s => s.trim()).filter(Boolean);
+  const parts = DEMO_TEXT.match(/[^.!?]+[.!?]*/g)?.map(s => s.trim()).filter(Boolean) || [];
   for (const p of parts) {
     await commitChunk(p);
   }
@@ -573,7 +662,6 @@ function addTranscriptChunk(text) {
   const placeholder = transcript.querySelector('.placeholder');
   if (placeholder) placeholder.remove();
 
-  // Un-highlight previous
   if (currentTranscriptLineEl) {
     currentTranscriptLineEl.classList.remove('is-current');
   }
@@ -585,10 +673,8 @@ function addTranscriptChunk(text) {
   transcript.appendChild(p);
   currentTranscriptLineEl = p;
 
-  // Auto-scroll like lyrics
-  p.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  // NOTE: no scrollIntoView (prevents page jump)
 
-  // Stats
   const words = text.trim().split(/\s+/).filter(Boolean);
   wordsRecognized += words.length;
   updateStats();
@@ -598,12 +684,10 @@ function addTranscriptChunk(text) {
 // TEXT PROCESSING & ASL TRANSLATION
 // --------------------------
 function applyAdaptiveSpeed() {
-  // Only adjust if playbackSpeed select exists
   if (!playbackSpeed) return;
 
   const q = videoQueue.length;
 
-  // These values MUST exist as <option> values in index.html
   if (q > 12) playbackSpeed.value = "2.5";
   else if (q > 6) playbackSpeed.value = "3";
   else playbackSpeed.value = "1.75";
@@ -612,27 +696,38 @@ function applyAdaptiveSpeed() {
   smoothPlayer.updateRates(rate);
 }
 
+function getAdaptiveSignBudget() {
+  const q = videoQueue.length;
+
+  // Tweak thresholds as you observe real classroom behavior
+  if (q <= 2) return SIGN_BUDGET.high;      // almost caught up: sign more words
+  if (q <= 6) return SIGN_BUDGET.medium;    // normal: sign a lot
+  if (q <= 10) return SIGN_BUDGET.low;      // getting behind: sign fewer
+  return SIGN_BUDGET.min;                   // overloaded: minimum meaning to catch up
+}
+
+function tokenizeInSpokenOrder(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
 async function processText(text) {
-  // If paused, do not translate
   if (isPaused) return;
 
-  let words = text
-  .toLowerCase()
-  .replace(/[^\w\s]/g, '')
-  .split(/\s+/)
-  .filter(w => w.length > 0);
+  let words = tokenizeInSpokenOrder(text);
 
-// 1) remove stopwords first (keeps meaning better under time pressure)
-words = words.filter(w => !isStopword(w));
+  // Remove stopwords but keep spoken order
+  words = words.filter(w => !isStopword(w));
 
-// 2) simple priority: longer words first (often more semantic)
-// (you can swap to frequency-based later)
-words.sort((a, b) => b.length - a.length);
-
-// 3) limit how many new signs we add for this chunk
-words = words.slice(0, MAX_SIGNS_PER_CHUNK);
+  // Adaptive budget
+  const budget = getAdaptiveSignBudget();
+  words = words.slice(0, budget);
 
   const missingWordsList = [];
+  const missingSet = new Set();
 
   for (const word of words) {
     try {
@@ -640,17 +735,22 @@ words = words.slice(0, MAX_SIGNS_PER_CHUNK);
       if (response.ok) {
         videoQueue.push({ type: 'word', value: word });
       } else {
-        missingWordsList.push(word);
+        if (!missingSet.has(word)) {
+          missingSet.add(word);
+          missingWordsList.push(word);
+        }
         videoQueue.push({ type: 'fingerspell', value: word });
       }
     } catch (error) {
       console.error(`Error checking word "${word}":`, error);
-      missingWordsList.push(word);
+      if (!missingSet.has(word)) {
+        missingSet.add(word);
+        missingWordsList.push(word);
+      }
       videoQueue.push({ type: 'fingerspell', value: word });
     }
   }
 
-  // Optional bottom section (safe if removed)
   if (missingWords) {
     if (missingWordsList.length > 0) {
       missingWords.textContent = missingWordsList.join(', ');
@@ -660,19 +760,17 @@ words = words.slice(0, MAX_SIGNS_PER_CHUNK);
       missingWords.style.color = '#27ae60';
     }
   }
-  // Backpressure: if queue is growing too large, drop older/less-meaningful items.
-  // Strategy: remove items from the FRONT (oldest) until we're under SOFT_QUEUE_ITEMS.
-if (videoQueue.length > MAX_QUEUE_ITEMS) {
-  // hard reset to newest items
-  videoQueue = videoQueue.slice(videoQueue.length - SOFT_QUEUE_ITEMS);
-  updateStatus('⚡ Catching up (skipping older signs to stay real-time)', 'warning');
-} else if (videoQueue.length > SOFT_QUEUE_ITEMS) {
-  // soft trim a little (drop a few oldest)
-  const trimCount = videoQueue.length - SOFT_QUEUE_ITEMS;
-  videoQueue.splice(0, trimCount);
-}
-//Apply adaptive speed based on current queue length
-applyAdaptiveSpeed();
+
+  // Backpressure trimming (keeps system real-time)
+  if (videoQueue.length > MAX_QUEUE_ITEMS) {
+    videoQueue = videoQueue.slice(videoQueue.length - SOFT_QUEUE_ITEMS);
+    updateStatus('⚡ Catching up (skipping older signs to stay real-time)', 'warning');
+  } else if (videoQueue.length > SOFT_QUEUE_ITEMS) {
+    const trimCount = videoQueue.length - SOFT_QUEUE_ITEMS;
+    videoQueue.splice(0, trimCount);
+  }
+
+  applyAdaptiveSpeed();
 
   if (!isPlayingVideo) {
     playNextVideo();
@@ -714,7 +812,6 @@ async function playWordSign(word) {
       await displayVideo(data.video_url, word, false);
       signsPlayed++;
       updateStats();
-      // continues on ended event
     } else {
       playNextVideo();
     }
@@ -952,4 +1049,4 @@ function setupKeyboardShortcuts() {
 // CONSOLE
 // --------------------------
 console.log('%c🌉 LingoBridge', 'font-size: 24px; font-weight: bold; color: #667eea;');
-console.log('%cReal-time Speech to ASL Translation System', 'font-size: 14px; color: #718096;');
+console.log('%cReal-time Speech to ASL Translation System', 'font-size: 14px; color: #718096;');z
