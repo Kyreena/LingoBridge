@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = window.location.origin;
 
 async function fetchJson(path) {
   const res = await fetch(`${API_BASE_URL}${path}`);
@@ -64,5 +64,5 @@ async function main() {
 
 main().catch(err => {
   console.error(err);
-  alert('Failed to load dashboard. Is the backend running at http://localhost:5000 ?');
+  alert(`Failed to load dashboard. Is the backend running at ${API_BASE_URL} ?`);
 });

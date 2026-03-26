@@ -3,6 +3,7 @@ from flask_cors import CORS
 import json
 import os
 import re
+import socket
 
 from analytics import (
     get_db_path,
@@ -169,7 +170,24 @@ def api_analytics_top_missing_words():
 # --------------------------
 # RUN SERVER
 # --------------------------
+def find_available_port(host, preferred_ports):
+    for port in preferred_ports:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind((host, port))
+                return port
+            except OSError:
+                continue
+    raise RuntimeError(f"Could not bind to any preferred port on {host}")
+
+
 if __name__ == "__main__":
+    host = os.environ.get("HOST", "127.0.0.1")
+    preferred_port = int(os.environ.get("PORT", "5000"))
+    port = find_available_port(host, [preferred_port, 5001, 8000, 8080])
+    debug = os.environ.get("FLASK_DEBUG", "1") == "1"
+
     print("\n" + "=" * 50)
     print("🚀 LingoBridge Backend Starting...")
     print("=" * 50)
@@ -178,7 +196,7 @@ if __name__ == "__main__":
     print(f"📊 Total Signs Loaded: {len(asl_map)}")
     print(f"🗄️  Analytics DB: {DB_PATH}")
     print("=" * 50)
-    print("🌐 Open http://localhost:5000 in your browser")
+    print(f"🌐 Open http://{host}:{port} in your browser")
     print("=" * 50 + "\n")
 
-    app.run(debug=True, port=5000)
+    app.run(debug=debug, host=host, port=port, use_reloader=False)

@@ -5,7 +5,7 @@
 // --------------------------
 // CONFIGURATION
 // --------------------------
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = window.location.origin;
 const DEMO_TEXT = "Hello my name is Halima. I love learning sign language. Thank you for watching.";
 
 // Silence timer (used only for fallback flushing when punctuation isn't coming through)
