@@ -137,21 +137,30 @@ class LingoBridge {
     
     /**
      * Clear transcript and reset
+     * FIX #2: Enhanced to fully clear ASL video display
      */
     clearTranscript() {
         this.transcript = [];
         this.transcriptBox.innerHTML = '<p class="placeholder">Spoken words will appear here...</p>';
         this.videoQueue = [];
         this.currentVideoIndex = 0;
+        this.isPlayingVideo = false;
         this.currentWordDisplay.textContent = '';
         
-        // Reset video display
+        // FIX #2: Completely reset video display
         this.aslVideo.pause();
         this.aslVideo.src = '';
+        this.aslVideo.currentTime = 0;
         this.aslVideo.classList.remove('active');
+        
+        // Ensure placeholder is visible
         if (this.videoPlaceholder) {
             this.videoPlaceholder.style.display = 'flex';
         }
+        
+        // Remove any active highlights from transcript
+        const allWords = this.transcriptBox.querySelectorAll('.word');
+        allWords.forEach(el => el.classList.remove('active'));
         
         this.updateStatus('Cleared. Ready to start.');
     }
@@ -174,9 +183,13 @@ class LingoBridge {
             }
         }
         
-        // Process final transcript
+        // FIX #1: Process final transcript AND split on commas for faster processing
         if (finalTranscript) {
-            this.processFinalTranscript(finalTranscript.trim());
+            // Split on commas and periods for more natural sentence detection
+            const sentences = finalTranscript.split(/[,.]/).map(s => s.trim()).filter(s => s.length > 0);
+            sentences.forEach(sentence => {
+                this.processFinalTranscript(sentence);
+            });
         }
         
         // Update status with interim results
@@ -187,6 +200,7 @@ class LingoBridge {
     
     /**
      * Process finalized speech transcript
+     * FIX #3: Enhanced with word stemming for better matching
      */
     processFinalTranscript(text) {
         console.log('Final transcript:', text);
@@ -199,15 +213,25 @@ class LingoBridge {
             const cleanWord = word.replace(/[.,!?;:]/g, '');
             this.transcript.push(cleanWord);
             
-            // Check if word has ASL sign
-            if (hasASLSign(cleanWord)) {
-                const signInfo = getASLSign(cleanWord);
+            // FIX #3: Try to find best match with word stemming
+            const matchResult = this.findBestWordMatch(cleanWord);
+            
+            if (matchResult.found) {
+                const signInfo = getASLSign(matchResult.matchedWord);
                 this.videoQueue.push({
                     word: cleanWord,
+                    displayWord: matchResult.matchedWord !== cleanWord.toLowerCase() ? 
+                        `${cleanWord} → ${matchResult.matchedWord}` : cleanWord,
                     videoUrl: signInfo.video,
-                    description: signInfo.description
+                    description: signInfo.description,
+                    isSubstitute: matchResult.matchedWord !== cleanWord.toLowerCase()
                 });
+                
+                if (matchResult.matchedWord !== cleanWord.toLowerCase()) {
+                    console.log(`Using substitute: "${cleanWord}" → "${matchResult.matchedWord}"`);
+                }
             }
+            // If no match found, we skip it (no fingerspelling for now)
         });
         
         // Update transcript display
@@ -220,7 +244,58 @@ class LingoBridge {
     }
     
     /**
+     * FIX #3: Find best word match using stemming and variations
+     * Tries to match words by removing common suffixes
+     */
+    findBestWordMatch(word) {
+        const lowerWord = word.toLowerCase().trim();
+        
+        // Direct match
+        if (hasASLSign(lowerWord)) {
+            return { found: true, matchedWord: lowerWord };
+        }
+        
+        // Try common word variations (stemming)
+        const stemmingRules = [
+            // Progressive forms: watching → watch, running → run
+            { suffix: 'ing', replacement: '' },
+            { suffix: 'ing', replacement: 'e' },  // writing → write
+            
+            // Past tense: walked → walk, jumped → jump
+            { suffix: 'ed', replacement: '' },
+            { suffix: 'ed', replacement: 'e' },   // moved → move
+            
+            // Plural forms: books → book, classes → class
+            { suffix: 'es', replacement: '' },
+            { suffix: 's', replacement: '' },
+            
+            // Comparative/superlative: bigger → big, fastest → fast
+            { suffix: 'er', replacement: '' },
+            { suffix: 'est', replacement: '' },
+            
+            // Other common suffixes
+            { suffix: 'ly', replacement: '' },    // quickly → quick
+            { suffix: 'ness', replacement: '' },  // happiness → happy (simplified)
+        ];
+        
+        // Try each stemming rule
+        for (const rule of stemmingRules) {
+            if (lowerWord.endsWith(rule.suffix) && lowerWord.length > rule.suffix.length) {
+                const stem = lowerWord.slice(0, -rule.suffix.length) + rule.replacement;
+                
+                if (hasASLSign(stem)) {
+                    return { found: true, matchedWord: stem };
+                }
+            }
+        }
+        
+        // No match found
+        return { found: false, matchedWord: null };
+    }
+    
+    /**
      * Update the transcript display
+     * FIX #3: Enhanced to show which words have matches (including stemmed matches)
      */
     updateTranscriptDisplay() {
         if (this.transcript.length === 0) {
@@ -231,8 +306,9 @@ class LingoBridge {
         // Build HTML with word highlighting
         let html = '';
         this.transcript.forEach((word, index) => {
-            const hasSign = hasASLSign(word);
-            const className = hasSign ? 'word has-sign' : 'word';
+            // Check if word has a direct match or stemmed match
+            const matchResult = this.findBestWordMatch(word);
+            const className = matchResult.found ? 'word has-sign' : 'word';
             html += `<span class="${className}" data-index="${index}">${word}</span> `;
         });
         
@@ -244,6 +320,7 @@ class LingoBridge {
     
     /**
      * Play next video in queue
+     * FIX #3: Enhanced to show word substitutions
      */
     playNextVideo() {
         if (this.currentVideoIndex >= this.videoQueue.length) {
@@ -264,8 +341,11 @@ class LingoBridge {
         
         console.log('Playing video for:', videoInfo.word);
         
-        // Update current word display
-        this.currentWordDisplay.textContent = `Signing: "${videoInfo.word}"`;
+        // FIX #3: Update current word display to show substitutions
+        const displayText = videoInfo.displayWord || videoInfo.word;
+        this.currentWordDisplay.textContent = videoInfo.isSubstitute ? 
+            `Signing: ${displayText}` : 
+            `Signing: "${videoInfo.word}"`;
         
         // Highlight the word in transcript
         this.highlightWordInTranscript(videoInfo.word);
