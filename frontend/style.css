@@ -249,6 +249,9 @@ body {
     line-height: 1.7;
     min-height: 300px;
     max-height: 400px;
+    scroll-behavior: smooth;
+    scroll-padding-top: 35%;
+    scroll-padding-bottom: 35%;
 }
 
 .transcript p {
@@ -266,7 +269,13 @@ body {
 .transcript-lyrics .transcript-line {
   background: #ffffff;
   border-left: 3px solid #3498db;
-  opacity: 0.85;
+  opacity: 0.5;
+  transform: scale(0.98);
+  transition: opacity 220ms ease, transform 220ms ease, background-color 220ms ease;
+}
+
+.transcript-lyrics .transcript-line.is-past {
+  opacity: 0.38;
 }
 
 .transcript-lyrics .transcript-line.is-current {
@@ -274,6 +283,7 @@ body {
   font-weight: 700;
   opacity: 1;
   border-left-color: #1f78c1;
+  transform: scale(1);
 }
 
 @keyframes slideIn {

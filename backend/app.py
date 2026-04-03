@@ -29,6 +29,7 @@ CORS(app)  # Allows frontend to talk to backend (important!)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # backend/ folder path
 VIDEO_DIR = os.path.join(BASE_DIR, "..", "dataset", "asl_videos")
 MAPPING_FILE = os.path.join(BASE_DIR, "..", "dataset", "asl_mapping.json")
+asl_map_mtime = None
 
 # --------------------------
 # ANALYTICS DB INIT (SQLite)
@@ -53,6 +54,105 @@ except json.JSONDecodeError:
     asl_map = {}
 
 # --------------------------
+# WORD RESOLUTION HELPERS
+# --------------------------
+try:
+    asl_map_mtime = os.path.getmtime(MAPPING_FILE)
+except FileNotFoundError:
+    asl_map_mtime = None
+
+
+def load_asl_map(force=False):
+    global asl_map, asl_map_mtime
+
+    try:
+        current_mtime = os.path.getmtime(MAPPING_FILE)
+    except FileNotFoundError:
+        print(f"âŒ ERROR: Could not find {MAPPING_FILE}")
+        print("   Make sure asl_mapping.json is in the dataset/ folder")
+        asl_map = {}
+        asl_map_mtime = None
+        return asl_map
+
+    if not force and asl_map_mtime == current_mtime:
+        return asl_map
+
+    try:
+        with open(MAPPING_FILE, "r", encoding="utf-8") as f:
+            asl_map = json.load(f)
+        asl_map_mtime = current_mtime
+        print(f"âœ… Reloaded {len(asl_map)} ASL signs from mapping file")
+    except json.JSONDecodeError:
+        print(f"âŒ ERROR: Invalid JSON in {MAPPING_FILE}")
+        asl_map = {}
+        asl_map_mtime = current_mtime
+
+    return asl_map
+
+
+def get_video_file(mapping_value):
+    return mapping_value.get("file") if isinstance(mapping_value, dict) else mapping_value
+
+
+def generate_lookup_candidates(word):
+    candidates = []
+    seen = set()
+
+    def add(candidate):
+        candidate = (candidate or "").strip().lower()
+        if not candidate or candidate in seen:
+            return
+        seen.add(candidate)
+        candidates.append(candidate)
+
+    add(word)
+
+    if len(word) > 4 and word.endswith("ies"):
+        add(word[:-3] + "y")
+
+    def maybe_drop_doubled_tail(base):
+        if len(base) >= 2 and base[-1] == base[-2]:
+            return [base[:-1]]
+        return []
+
+    suffix_rules = [
+        ("ing", lambda w: [w[:-3], w[:-3] + "e", *maybe_drop_doubled_tail(w[:-3])]),
+        ("ed", lambda w: [w[:-2], w[:-1], w[:-2] + "e", *maybe_drop_doubled_tail(w[:-2])]),
+        ("es", lambda w: [w[:-2], w[:-1]]),
+        ("s", lambda w: [w[:-1]]),
+        ("ly", lambda w: [w[:-2]]),
+        ("er", lambda w: [w[:-2]]),
+        ("est", lambda w: [w[:-3]]),
+    ]
+
+    for suffix, transform in suffix_rules:
+        if len(word) <= len(suffix) + 1 or not word.endswith(suffix):
+            continue
+        for candidate in transform(word):
+            add(candidate)
+
+    return candidates
+
+
+def resolve_asl_word(raw_text):
+    load_asl_map()
+
+    clean_text = re.sub(r"[^\w\s]", "", raw_text).lower().strip()
+    if not clean_text:
+        return None
+
+    for candidate in generate_lookup_candidates(clean_text):
+        if candidate in asl_map:
+            return {
+                "requested_word": clean_text,
+                "resolved_word": candidate,
+                "video_file": get_video_file(asl_map[candidate]),
+            }
+
+    return None
+
+
+# --------------------------
 # FRONTEND ROUTES
 # --------------------------
 @app.route("/")
@@ -72,17 +172,17 @@ def get_asl():
     if not raw_text:
         return jsonify({"error": "No word provided"}), 400
 
-    # 1. Normalize the input (remove punctuation, lowercase)
+    resolved = resolve_asl_word(raw_text)
+    if resolved:
+        return jsonify(
+            {
+                "word": resolved["requested_word"],
+                "resolved_word": resolved["resolved_word"],
+                "video_url": f"/videos/{resolved['video_file']}",
+            }
+        )
+
     clean_text = re.sub(r"[^\w\s]", "", raw_text).lower().strip()
-
-    # 2. Check if the exact word exists in our mapping
-    if clean_text in asl_map:
-        video_data = asl_map[clean_text]
-        
-        video_file = video_data.get("file") if isinstance(video_data, dict) else video_data
-
-        return jsonify({"word": clean_text, "video_url": f"/videos/{video_file}"})
-
     return jsonify({"error": f"No ASL video found for '{clean_text}'"}), 404
 
 # --------------------------
@@ -100,6 +200,7 @@ def serve_video(filename):
 # --------------------------
 @app.route("/health")
 def health():
+    load_asl_map()
     return jsonify(
         {
             "status": "running",

@@ -103,20 +103,28 @@ def summary(db_path: str):
     }
 
 def top_missing_words(db_path: str, limit: int = 10):
-    # We log missing words as events: type='missing_word', payload={"word": "photosynthesis"}
     with connect(db_path) as conn:
         rows = conn.execute(
             """
-            SELECT
-              json_extract(payload, '$.word') AS word,
-              COUNT(*) AS c
+            SELECT payload
             FROM events
             WHERE type = 'missing_word'
-            GROUP BY word
-            ORDER BY c DESC
-            LIMIT ?
-            """,
-            (limit,),
+            ORDER BY id DESC
+            """
         ).fetchall()
 
-    return [{"word": r["word"], "count": r["c"]} for r in rows if r["word"]]
+    counts = {}
+    for row in rows:
+        payload = row["payload"] or "{}"
+        try:
+            word = (json.loads(payload).get("word") or "").strip().lower()
+        except json.JSONDecodeError:
+            continue
+
+        if not word:
+            continue
+        counts[word] = counts.get(word, 0) + 1
+
+    items = [{"word": word, "count": count} for word, count in counts.items()]
+    items.sort(key=lambda item: (-item["count"], item["word"]))
+    return items[:limit]

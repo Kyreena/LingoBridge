@@ -17,9 +17,12 @@ const MAX_QUEUE_ITEMS = 18;   // hard ceiling on queued items
 const SOFT_QUEUE_ITEMS = 12;  // start trimming above this
 
 // Sentence-aware buffering:
-// prefer committing only when we see . ! ?
-// but don't stall forever if user doesn't say punctuation
+// prefer committing on stronger punctuation, but also allow natural reading pauses
+// without waiting for a full stop every time
 const MAX_WORDS_WITHOUT_PUNCTUATION = 20;
+const HARD_SENTENCE_PUNCTUATION = '.!?';
+const SOFT_SENTENCE_PUNCTUATION = ',;:';
+const MIN_WORDS_FOR_SOFT_BREAK = 3;
 
 // Adaptive “sign budget” per committed sentence
 // (how many words from the sentence we will try to sign)
@@ -113,6 +116,12 @@ let isFingerspelling = false;
 // Track what item we are currently playing so pause/resume can resume mid-video.
 let currentQueueItem = null;
 let pausedMidItem = false;
+const aslLookupCache = new Map();
+const MAX_LOOKUP_CACHE_SIZE = 400;
+let commitChain = Promise.resolve();
+let commitGeneration = 0;
+let currentSessionId = null;
+let currentSessionMode = null;
 
 // Speech buffering
 let interimBuffer = '';
@@ -143,12 +152,24 @@ window.addEventListener('load', async () => {
   transcript.classList.add('transcript-lyrics');
 });
 
+window.addEventListener('beforeunload', () => {
+  if (!currentSessionId) return;
+
+  const payload = JSON.stringify({ session_id: currentSessionId });
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon(`${API_BASE_URL}/api/session/end`, new Blob([payload], { type: 'application/json' }));
+  }
+});
+
 // --------------------------
 // SMOOTH VIDEO PLAYER (A/B)
 // --------------------------
 const smoothPlayer = (() => {
   let active = aslVideoA;
   let inactive = aslVideoB;
+  let preloadedUrl = null;
+  let preloadedRate = null;
+  let preloadPromise = null;
 
   function ensureInit() {
     if (!active || !inactive) return false;
@@ -158,6 +179,12 @@ const smoothPlayer = (() => {
   }
 
   ensureInit();
+
+  function clearPreloadState() {
+    preloadedUrl = null;
+    preloadedRate = null;
+    preloadPromise = null;
+  }
 
   function getFullUrl(videoUrl) {
     return `${API_BASE_URL}${videoUrl}`;
@@ -179,6 +206,42 @@ const smoothPlayer = (() => {
     });
   }
 
+  function isInactivePreloaded(url, rate) {
+    return (
+      preloadedUrl === url &&
+      preloadedRate === rate &&
+      inactive &&
+      inactive.src === url
+    );
+  }
+
+  async function preload(videoUrl, opts = {}) {
+    if (!ensureInit()) return false;
+    if (isPaused) return false;
+
+    const { rateMultiplier = 1.0 } = opts;
+    const baseRate = parseFloat(playbackSpeed.value || '1');
+    const rate = baseRate * rateMultiplier;
+    const url = getFullUrl(videoUrl);
+
+    if (active?.src === url) return false;
+    if (isInactivePreloaded(url, rate)) {
+      if (preloadPromise) await preloadPromise;
+      return true;
+    }
+
+    preloadedUrl = url;
+    preloadedRate = rate;
+    preloadPromise = prime(url, rate)
+      .catch((error) => {
+        clearPreloadState();
+        throw error;
+      });
+
+    await preloadPromise;
+    return true;
+  }
+
   async function playNow(videoUrl, opts = {}) {
     if (!ensureInit()) return;
     if (isPaused) return;
@@ -188,12 +251,17 @@ const smoothPlayer = (() => {
     const rate = baseRate * rateMultiplier;
     const url = getFullUrl(videoUrl);
 
-    await prime(url, rate);
+    if (isInactivePreloaded(url, rate)) {
+      if (preloadPromise) await preloadPromise;
+    } else {
+      await prime(url, rate);
+    }
 
     // swap
     const prev = active;
     active = inactive;
     inactive = prev;
+    clearPreloadState();
 
     active.classList.add('is-active');
     inactive.classList.remove('is-active');
@@ -229,11 +297,20 @@ const smoothPlayer = (() => {
   function updateRates(newRate) {
     if (aslVideoA) aslVideoA.playbackRate = newRate;
     if (aslVideoB) aslVideoB.playbackRate = newRate;
+    clearPreloadState();
   }
 
   function stopAll() {
     if (aslVideoA) aslVideoA.pause();
     if (aslVideoB) aslVideoB.pause();
+    [aslVideoA, aslVideoB].forEach((video) => {
+      if (!video) return;
+      video.removeAttribute('src');
+      video.load();
+      video.classList.remove('is-active');
+    });
+    clearPreloadState();
+    ensureInit();
   }
 
   function pauseActive() {
@@ -265,6 +342,7 @@ const smoothPlayer = (() => {
   return {
     playNow,
     waitForEndOrError,
+    preload,
     updateRates,
     stopAll,
     pauseActive,
@@ -438,19 +516,29 @@ function safeStartRecognition() {
 // --------------------------
 function splitIntoSentencesWithDelimiters(text) {
   const complete = [];
-  let remainder = text;
+  let remainder = '';
+  let start = 0;
 
-  const re = /([^.!?]*[.!?]+)/g;
-  let match;
-  let lastIndex = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (!HARD_SENTENCE_PUNCTUATION.includes(ch) && !SOFT_SENTENCE_PUNCTUATION.includes(ch)) {
+      continue;
+    }
 
-  while ((match = re.exec(text)) !== null) {
-    const sentence = match[0].trim();
-    if (sentence) complete.push(sentence);
-    lastIndex = re.lastIndex;
+    const next = text[i + 1] || '';
+    const nextIsBoundary = !next || /\s/.test(next) || /["')\]]/.test(next);
+    if (!nextIsBoundary) continue;
+
+    const chunk = text.slice(start, i + 1).trim();
+    const wordCount = chunk.split(/\s+/).filter(Boolean).length;
+    const isSoftBreak = SOFT_SENTENCE_PUNCTUATION.includes(ch);
+    if (isSoftBreak && wordCount < MIN_WORDS_FOR_SOFT_BREAK) continue;
+
+    if (chunk) complete.push(chunk);
+    start = i + 1;
   }
 
-  remainder = text.slice(lastIndex).trim();
+  remainder = text.slice(start).trim();
   return { complete, remainder };
 }
 
@@ -461,7 +549,7 @@ function flushCompleteSentencesFromBuffer() {
   const { complete, remainder } = splitIntoSentencesWithDelimiters(buf);
 
   // Commit full sentences in order
-  complete.forEach(s => commitChunk(s));
+  complete.forEach(s => enqueueCommitChunk(s));
 
   sentenceBuffer = remainder;
 
@@ -470,7 +558,7 @@ function flushCompleteSentencesFromBuffer() {
   if (wc >= MAX_WORDS_WITHOUT_PUNCTUATION) {
     const forced = sentenceBuffer.trim();
     sentenceBuffer = '';
-    if (forced) commitChunk(forced);
+    if (forced) enqueueCommitChunk(forced);
   }
 }
 
@@ -511,12 +599,100 @@ async function commitChunk(text) {
   await processText(cleaned);
 }
 
+function enqueueCommitChunk(text) {
+  const generation = commitGeneration;
+  commitChain = commitChain
+    .then(async () => {
+      if (generation !== commitGeneration) return;
+      await commitChunk(text);
+    })
+    .catch((error) => {
+      console.error('Error while committing chunk:', error);
+    });
+
+  return commitChain;
+}
+
+function resetCommitPipeline() {
+  commitGeneration += 1;
+  commitChain = Promise.resolve();
+}
+
+async function startAnalyticsSession(mode) {
+  if (currentSessionId && currentSessionMode === mode) return currentSessionId;
+  if (currentSessionId) await endAnalyticsSession();
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/session/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode })
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    currentSessionId = data.session_id || null;
+    currentSessionMode = mode;
+    return currentSessionId;
+  } catch (error) {
+    console.error('Failed to start analytics session:', error);
+    return null;
+  }
+}
+
+async function endAnalyticsSession() {
+  if (!currentSessionId) return;
+
+  const sessionId = currentSessionId;
+  currentSessionId = null;
+  currentSessionMode = null;
+
+  try {
+    await fetch(`${API_BASE_URL}/api/session/end`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId })
+    });
+  } catch (error) {
+    console.error('Failed to end analytics session:', error);
+  }
+}
+
+async function bumpAnalyticsCounter(field, amount = 1) {
+  if (!currentSessionId || amount <= 0) return;
+
+  try {
+    await fetch(`${API_BASE_URL}/api/session/bump`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: currentSessionId, field, amount })
+    });
+  } catch (error) {
+    console.error(`Failed to bump analytics counter "${field}":`, error);
+  }
+}
+
+async function logAnalyticsEvent(type, payload = {}) {
+  if (!currentSessionId) return;
+
+  try {
+    await fetch(`${API_BASE_URL}/api/event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: currentSessionId, type, payload })
+    });
+  } catch (error) {
+    console.error(`Failed to log analytics event "${type}":`, error);
+  }
+}
+
 // --------------------------
 // CONTROL FUNCTIONS
 // --------------------------
-function startListening() {
+async function startListening() {
   isPaused = false;
   isListening = true;
+  await startAnalyticsSession('live');
 
   if (!safeStartRecognition()) {
     isListening = false;
@@ -531,6 +707,7 @@ function stopListening() {
     try { recognition.stop(); } catch {}
   }
 
+  resetCommitPipeline();
   clearSilenceFlush();
   interimBuffer = '';
   sentenceBuffer = '';
@@ -542,11 +719,14 @@ function stopListening() {
 
   if (pauseBtn) pauseBtn.disabled = true;
   if (resumeBtn) resumeBtn.disabled = true;
+
+  endAnalyticsSession();
 }
 
 function pauseInterpretation() {
   if (isPaused) return;
   isPaused = true;
+  bumpAnalyticsCounter('pauses');
 
   // Stop recognition (no new transcript while paused)
   if (recognition) {
@@ -554,6 +734,7 @@ function pauseInterpretation() {
     try { recognition.stop(); } catch {}
   }
 
+  resetCommitPipeline();
   clearSilenceFlush();
   interimBuffer = '';
   sentenceBuffer = '';
@@ -580,6 +761,7 @@ function resumeInterpretation() {
 
   updateStatus('▶️ Resuming...', 'listening');
 
+  bumpAnalyticsCounter('resumes');
   if (!safeStartRecognition()) {
     isListening = false;
     isPaused = true;
@@ -627,11 +809,17 @@ function clearTranscript() {
   pausedMidItem = false;
   smoothPlayer.stopAll();
 
+  resetCommitPipeline();
   interimBuffer = '';
   sentenceBuffer = '';
   clearSilenceFlush();
 
   currentTranscriptLineEl = null;
+  currentWord.textContent = '';
+  currentWord.style.backgroundColor = '';
+
+  const placeholder = videoContainer.querySelector('.video-placeholder');
+  if (placeholder) placeholder.style.display = 'block';
 
   updateStats();
   updateStatus('🗑️ Transcript cleared', 'idle');
@@ -642,6 +830,7 @@ async function startDemo() {
 
   stopListening();
   isPaused = false;
+  await startAnalyticsSession('demo');
 
   videoQueue = [];
   isPlayingVideo = false;
@@ -654,7 +843,7 @@ async function startDemo() {
 
   const parts = DEMO_TEXT.match(/[^.!?]+[.!?]*/g)?.map(s => s.trim()).filter(Boolean) || [];
   for (const p of parts) {
-    await commitChunk(p);
+    await enqueueCommitChunk(p);
   }
 
   updateStatus('✅ Demo complete', 'success');
@@ -690,6 +879,7 @@ function addTranscriptChunk(text) {
 
   if (currentTranscriptLineEl) {
     currentTranscriptLineEl.classList.remove('is-current');
+    currentTranscriptLineEl.classList.add('is-past');
   }
 
   const p = document.createElement('p');
@@ -699,11 +889,12 @@ function addTranscriptChunk(text) {
   transcript.appendChild(p);
   currentTranscriptLineEl = p;
 
-  // NOTE: no scrollIntoView (prevents page jump)
+  p.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
   const words = text.trim().split(/\s+/).filter(Boolean);
   wordsRecognized += words.length;
   updateStats();
+  bumpAnalyticsCounter('words_recognized', words.length);
 }
 
 // --------------------------
@@ -740,6 +931,129 @@ function tokenizeInSpokenOrder(text) {
     .filter(Boolean);
 }
 
+function getCachedAslMatch(word) {
+  if (!aslLookupCache.has(word)) return undefined;
+
+  const cached = aslLookupCache.get(word);
+  // Refresh insertion order so repeated classroom words stay hot.
+  aslLookupCache.delete(word);
+  aslLookupCache.set(word, cached);
+  return cached;
+}
+
+function setCachedAslMatch(word, value) {
+  if (aslLookupCache.has(word)) {
+    aslLookupCache.delete(word);
+  }
+
+  aslLookupCache.set(word, value);
+
+  if (aslLookupCache.size > MAX_LOOKUP_CACHE_SIZE) {
+    const oldestKey = aslLookupCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      aslLookupCache.delete(oldestKey);
+    }
+  }
+}
+
+function generateLookupCandidates(word) {
+  const candidates = [];
+  const seen = new Set();
+
+  const add = (candidate) => {
+    const normalized = (candidate || '').trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    candidates.push(normalized);
+  };
+
+  add(word);
+
+  if (word.length > 4 && word.endsWith('ies')) {
+    add(`${word.slice(0, -3)}y`);
+  }
+
+  const maybeDropDoubledTail = (base) => {
+    if (base.length >= 2 && base.charAt(base.length - 1) === base.charAt(base.length - 2)) {
+      return [base.slice(0, -1)];
+    }
+    return [];
+  };
+
+  const suffixRules = [
+    ['ing', (w) => [w.slice(0, -3), `${w.slice(0, -3)}e`, ...maybeDropDoubledTail(w.slice(0, -3))]],
+    ['ed', (w) => [w.slice(0, -2), w.slice(0, -1), `${w.slice(0, -2)}e`, ...maybeDropDoubledTail(w.slice(0, -2))]],
+    ['es', (w) => [w.slice(0, -2), w.slice(0, -1)]],
+    ['s', (w) => [w.slice(0, -1)]],
+    ['ly', (w) => [w.slice(0, -2)]],
+    ['er', (w) => [w.slice(0, -2)]],
+    ['est', (w) => [w.slice(0, -3)]]
+  ];
+
+  for (const [suffix, transform] of suffixRules) {
+    if (word.length <= suffix.length + 1 || !word.endsWith(suffix)) continue;
+    transform(word).forEach(add);
+  }
+
+  return candidates;
+}
+
+async function fetchBestAslMatch(word) {
+  const cached = getCachedAslMatch(word);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  for (const candidate of generateLookupCandidates(word)) {
+    const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(candidate)}`);
+    if (!response.ok) continue;
+
+    const data = await response.json();
+    const match = {
+      requestedWord: word,
+      resolvedWord: data.resolved_word || data.word || candidate,
+      videoUrl: data.video_url
+    };
+    setCachedAslMatch(word, match);
+    return match;
+  }
+
+  setCachedAslMatch(word, null);
+  return null;
+}
+
+function getNextPreloadableQueueItem() {
+  return videoQueue.find((item) => item?.type === 'word' && item.videoUrl);
+}
+
+function preloadUpcomingVideo() {
+  if (isPaused || isFingerspelling) return;
+  if (!currentQueueItem || currentQueueItem.type !== 'word') return;
+
+  const nextItem = getNextPreloadableQueueItem();
+  if (!nextItem) return;
+
+  smoothPlayer.preload(nextItem.videoUrl).catch((error) => {
+    console.error('Error preloading upcoming video:', error);
+  });
+}
+
+function isSameQueueItem(a, b) {
+  if (!a || !b) return false;
+  return a.type === b.type && a.value === b.value;
+}
+
+function enqueueVideoItem(item) {
+  const lastQueuedItem = videoQueue.length > 0 ? videoQueue[videoQueue.length - 1] : null;
+
+  if (isSameQueueItem(lastQueuedItem, item) || isSameQueueItem(currentQueueItem, item)) {
+    return false;
+  }
+
+  videoQueue.push(item);
+  return true;
+}
+
 async function processText(text) {
   if (isPaused) return;
 
@@ -757,15 +1071,20 @@ async function processText(text) {
 
   for (const word of words) {
     try {
-      const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(word)}`);
-      if (response.ok) {
-        videoQueue.push({ type: 'word', value: word });
+      const match = await fetchBestAslMatch(word);
+      if (match) {
+        enqueueVideoItem({
+          type: 'word',
+          value: match.resolvedWord,
+          source: match.requestedWord,
+          videoUrl: match.videoUrl
+        });
       } else {
         if (!missingSet.has(word)) {
           missingSet.add(word);
           missingWordsList.push(word);
         }
-        videoQueue.push({ type: 'fingerspell', value: word });
+        enqueueVideoItem({ type: 'fingerspell', value: word });
       }
     } catch (error) {
       console.error(`Error checking word "${word}":`, error);
@@ -773,7 +1092,7 @@ async function processText(text) {
         missingSet.add(word);
         missingWordsList.push(word);
       }
-      videoQueue.push({ type: 'fingerspell', value: word });
+      enqueueVideoItem({ type: 'fingerspell', value: word });
     }
   }
 
@@ -798,8 +1117,19 @@ async function processText(text) {
 
   applyAdaptiveSpeed();
 
+  if (isPlayingVideo) {
+    preloadUpcomingVideo();
+  }
+
   if (!isPlayingVideo) {
     playNextVideo();
+  }
+
+  if (missingWordsList.length > 0) {
+    bumpAnalyticsCounter('fingerspelled_words', missingWordsList.length);
+    missingWordsList.forEach((word) => {
+      logAnalyticsEvent('missing_word', { word });
+    });
   }
 }
 
@@ -815,6 +1145,8 @@ async function playNextVideo() {
     currentQueueItem = null;
     currentWord.textContent = '';
     currentWord.style.backgroundColor = '';
+    const placeholder = videoContainer.querySelector('.video-placeholder');
+    if (placeholder) placeholder.style.display = 'block';
     return;
   }
 
@@ -824,26 +1156,39 @@ async function playNextVideo() {
   pausedMidItem = false;
 
   if (item.type === 'word') {
-    await playWordSign(item.value);
+    await playWordSign(item);
   } else if (item.type === 'fingerspell') {
     await fingerspellWord(item.value);
   }
 }
 
-async function playWordSign(word) {
+async function playWordSign(wordOrItem) {
   if (isPaused) return;
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/get_asl?word=${encodeURIComponent(word)}`);
-    const data = await response.json();
+  const item = typeof wordOrItem === 'string' ? { value: wordOrItem } : (wordOrItem || {});
+  const word = item.value;
 
-    if (response.ok) {
-      await displayVideo(data.video_url, word, false);
+  try {
+    if (item.videoUrl) {
+      await displayVideo(item.videoUrl, item.source || word, false);
       signsPlayed++;
       updateStats();
-    } else {
-      playNextVideo();
+      bumpAnalyticsCounter('signs_played');
+      preloadUpcomingVideo();
+      return;
     }
+
+    const match = await fetchBestAslMatch(word);
+    if (!match?.videoUrl) {
+      playNextVideo();
+      return;
+    }
+
+    await displayVideo(match.videoUrl, item.source || match.requestedWord || word, false);
+    signsPlayed++;
+    updateStats();
+    bumpAnalyticsCounter('signs_played');
+    preloadUpcomingVideo();
   } catch (error) {
     console.error(`Error fetching ASL for "${word}":`, error);
     updateStatus('⚠️ Connection error. Check if backend is running.', 'warning');
@@ -879,6 +1224,7 @@ async function fingerspellWord(word) {
         await displayVideoAndWait(data.video_url, `${letterRaw.toUpperCase()} (${i + 1}/${letters.length})`, true);
         signsPlayed++;
         updateStats();
+        bumpAnalyticsCounter('signs_played');
       } else {
         await showLetterPlaceholder(letterRaw.toUpperCase(), 500);
       }

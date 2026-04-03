@@ -6,6 +6,20 @@ async function fetchJson(path) {
   return res.json();
 }
 
+function showLoadIssue(message) {
+  const existing = document.getElementById('dashboardNotice');
+  if (existing) {
+    existing.textContent = message;
+    return;
+  }
+
+  const notice = document.createElement('div');
+  notice.id = 'dashboardNotice';
+  notice.className = 'status status-warning';
+  notice.textContent = message;
+  document.querySelector('main')?.prepend(notice);
+}
+
 function renderSummary(data) {
   const el = document.getElementById('summary');
   el.innerHTML = `
@@ -52,14 +66,40 @@ function renderSessions(sessions) {
 }
 
 async function main() {
-  const s = await fetchJson('/api/analytics/summary');
-  renderSummary(s);
+  const results = await Promise.allSettled([
+    fetchJson('/api/analytics/summary'),
+    fetchJson('/api/analytics/top-missing-words?limit=10'),
+    fetchJson('/api/analytics/sessions?limit=50')
+  ]);
 
-  const m = await fetchJson('/api/analytics/top-missing-words?limit=10');
-  renderTopMissingWords(m.top_missing_words || []);
+  const [summaryResult, missingResult, sessionsResult] = results;
+  let failedSections = 0;
 
-  const sess = await fetchJson('/api/analytics/sessions?limit=50');
-  renderSessions(sess.sessions || []);
+  if (summaryResult.status === 'fulfilled') {
+    renderSummary(summaryResult.value);
+  } else {
+    failedSections += 1;
+    showLoadIssue('Some analytics sections could not be loaded.');
+  }
+
+  if (missingResult.status === 'fulfilled') {
+    renderTopMissingWords(missingResult.value.top_missing_words || []);
+  } else {
+    failedSections += 1;
+    renderTopMissingWords([]);
+    showLoadIssue('Some analytics sections could not be loaded.');
+  }
+
+  if (sessionsResult.status === 'fulfilled') {
+    renderSessions(sessionsResult.value.sessions || []);
+  } else {
+    failedSections += 1;
+    showLoadIssue('Some analytics sections could not be loaded.');
+  }
+
+  if (failedSections === results.length) {
+    throw new Error(`Failed to load analytics from ${API_BASE_URL}`);
+  }
 }
 
 main().catch(err => {
