@@ -49,7 +49,7 @@
     <!-- CSS -->
     <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="app-page">
 
     <!-- ================= HEADER ================= -->
     <header class="header">
@@ -72,6 +72,18 @@
     <!-- ================= APP CONTAINER ================= -->
     <div class="app">
         <main role="main">
+            <section class="hero hero-grid" aria-label="Application overview">
+                <div class="hero-copy">
+                    <span class="hero-eyebrow">Inclusive Classroom Interpreter</span>
+                    <h2>Keep speech, signs, and feedback visible in one calm workspace.</h2>
+                    <p>LingoBridge turns spoken English into ASL video playback while keeping the transcript readable and the live state easy to scan from the front of the room.</p>
+                </div>
+                <div class="hero-chips" aria-label="Highlights">
+                    <span class="app-chip">Real-time transcript</span>
+                    <span class="app-chip">ASL video queue</span>
+                    <span class="app-chip">Missing-word tracking</span>
+                </div>
+            </section>
             <!-- Controls Section -->
             <section class="controls" role="toolbar" aria-label="Main controls">
                 <button id="startBtn" class="btn btn-primary" aria-label="Start listening to speech">
@@ -103,7 +115,7 @@
             <div id="status" class="status" role="status" aria-live="polite">Ready to start</div>
             
             <!-- Statistics Bar -->
-            <section class="stats-bar" role="region" aria-label="Statistics">
+            <section class="stats-bar summary-strip" role="region" aria-label="Statistics">
                 <div class="stat-item">
                     <span class="stat-label">Words Recognized:</span>
                     <span id="wordCount" class="stat-value">0</span>
@@ -121,7 +133,7 @@
             <!-- Main Content Grid -->
             <div class="main-content">
                 <!-- Transcript Panel -->
-                <section class="card transcript-panel" role="region" aria-label="Live transcript">
+                <section class="card transcript-panel feature-card" role="region" aria-label="Live transcript">
                     <h2>Live Transcript</h2>
                     <div id="transcript" class="transcript transcript-lyrics" role="log" aria-live="polite">
                         <p class="placeholder">Spoken words will appear here...</p>
@@ -129,7 +141,7 @@
                 </section>
 
                 <!-- Video Panel -->
-                <section class="card video-panel" role="region" aria-label="ASL video translation">
+                <section class="card video-panel feature-card" role="region" aria-label="ASL video translation">
                     <h2>ASL Translation</h2>
                     <div class="video-controls">
                         <button id="fullscreenBtn" class="btn-icon" aria-label="Toggle fullscreen" title="Fullscreen">
@@ -143,9 +155,9 @@
                             <option value="1.25">1.25x</option>
                             <option value="1.5">1.5x</option>
                             <option value="1.75">1.75x</option>
-                            <option value="2" selected>2x</option>
+                            <option value="2">2x</option>
                             <option value="2.5">2.5x</option>
-                            <option value="3">3x</option>
+                            <option value="3" selected>3x</option>
                         </select>
                     </div>
                     <div id="videoContainer" class="video-container">

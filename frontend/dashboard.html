@@ -6,7 +6,7 @@
   <title>LingoBridge Dashboard</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="dashboard-page">
   <header class="header">
     <h1>LingoBridge Dashboard</h1>
     <p>Session logging & analytics (privacy-safe)</p>
@@ -17,19 +17,32 @@
 
   <div class="app">
     <main role="main">
-      <section class="card">
+      <section class="hero hero-dashboard" aria-label="Analytics overview">
+        <div class="hero-copy">
+          <span class="hero-eyebrow">Analytics Overview</span>
+          <h2>See what the system understood, what it missed, and what to improve next.</h2>
+          <p>The dashboard turns live sessions into practical feedback so you can prioritize new signs, monitor usage, and tune the classroom experience over time.</p>
+        </div>
+        <div class="hero-chips" aria-label="Analytics highlights">
+          <span class="app-chip">Top missing words</span>
+          <span class="app-chip">Recent sessions</span>
+          <span class="app-chip">Usage summary</span>
+        </div>
+      </section>
+
+      <section class="card dashboard-card">
         <h2>Summary</h2>
         <div id="summary" class="stats-bar" style="display:flex;"></div>
       </section>
 
-      <section class="card">
+      <section class="card dashboard-card">
         <h2>Top Missing Words</h2>
-        <ul id="topMissingWords"></ul>
+        <ul id="topMissingWords" class="insight-list"></ul>
       </section>
 
-      <section class="card">
+      <section class="card dashboard-card">
         <h2>Recent Sessions</h2>
-        <div style="overflow:auto;">
+        <div class="table-shell">
           <table class="table" id="sessionsTable">
             <thead>
               <tr>

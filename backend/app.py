@@ -97,6 +97,10 @@ def get_video_file(mapping_value):
 def generate_lookup_candidates(word):
     candidates = []
     seen = set()
+    direct_aliases = {
+        "writer": ["write"],
+        "correction": ["correct"],
+    }
 
     def add(candidate):
         candidate = (candidate or "").strip().lower()
@@ -106,6 +110,9 @@ def generate_lookup_candidates(word):
         candidates.append(candidate)
 
     add(word)
+
+    for alias in direct_aliases.get(word, []):
+        add(alias)
 
     if len(word) > 4 and word.endswith("ies"):
         add(word[:-3] + "y")
@@ -118,10 +125,13 @@ def generate_lookup_candidates(word):
     suffix_rules = [
         ("ing", lambda w: [w[:-3], w[:-3] + "e", *maybe_drop_doubled_tail(w[:-3])]),
         ("ed", lambda w: [w[:-2], w[:-1], w[:-2] + "e", *maybe_drop_doubled_tail(w[:-2])]),
+        ("ment", lambda w: [w[:-4], w[:-4] + "e"]),
+        ("ness", lambda w: [w[:-4]]),
         ("es", lambda w: [w[:-2], w[:-1]]),
         ("s", lambda w: [w[:-1]]),
         ("ly", lambda w: [w[:-2]]),
-        ("er", lambda w: [w[:-2]]),
+        ("er", lambda w: [w[:-2], w[:-2] + "e"]),
+        ("or", lambda w: [w[:-2], w[:-2] + "e"]),
         ("est", lambda w: [w[:-3]]),
     ]
 
@@ -150,6 +160,17 @@ def resolve_asl_word(raw_text):
             }
 
     return None
+
+
+def build_sign_manifest():
+    load_asl_map()
+    manifest = {}
+    for word, mapping_value in asl_map.items():
+        video_file = get_video_file(mapping_value)
+        if not video_file:
+            continue
+        manifest[word] = f"/videos/{video_file}"
+    return manifest
 
 
 # --------------------------
@@ -184,6 +205,17 @@ def get_asl():
 
     clean_text = re.sub(r"[^\w\s]", "", raw_text).lower().strip()
     return jsonify({"error": f"No ASL video found for '{clean_text}'"}), 404
+
+
+@app.route("/api/sign-manifest")
+def api_sign_manifest():
+    manifest = build_sign_manifest()
+    return jsonify(
+        {
+            "total_signs": len(manifest),
+            "signs": manifest,
+        }
+    )
 
 # --------------------------
 # VIDEO SERVING ROUTE

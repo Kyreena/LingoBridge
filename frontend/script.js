@@ -122,10 +122,15 @@ let commitChain = Promise.resolve();
 let commitGeneration = 0;
 let currentSessionId = null;
 let currentSessionMode = null;
+let signManifest = new Map();
+let isSignManifestLoaded = false;
 
 // Speech buffering
 let interimBuffer = '';
 let silenceTimer = null;
+let lastInterimTranscript = '';
+let lastInterimSeenAt = 0;
+const INTERIM_REPEAT_SUPPRESS_MS = 900;
 
 // Sentence buffer (committed on punctuation/fallback)
 let sentenceBuffer = '';
@@ -139,6 +144,7 @@ let currentTranscriptLineEl = null;
 window.addEventListener('load', async () => {
   initializeSpeechRecognition();
   loadSettings();
+  await loadSignManifest();
   await checkServerHealth();
   setupEventListeners();
   setupKeyboardShortcuts();
@@ -160,6 +166,21 @@ window.addEventListener('beforeunload', () => {
     navigator.sendBeacon(`${API_BASE_URL}/api/session/end`, new Blob([payload], { type: 'application/json' }));
   }
 });
+
+async function loadSignManifest() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/sign-manifest`);
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+
+    const data = await response.json();
+    signManifest = new Map(Object.entries(data.signs || {}));
+    isSignManifestLoaded = true;
+  } catch (error) {
+    console.error('Failed to load sign manifest:', error);
+    signManifest = new Map();
+    isSignManifestLoaded = false;
+  }
+}
 
 // --------------------------
 // SMOOTH VIDEO PLAYER (A/B)
@@ -452,13 +473,26 @@ function initializeSpeechRecognition() {
     }
 
     if (interimTranscript) {
-      interimBuffer = interimTranscript;
-      scheduleSilenceFlush();
+      const normalizedInterim = interimTranscript.trim().replace(/\s+/g, ' ');
+      const now = Date.now();
+      const isRepeatedInterim =
+        normalizedInterim &&
+        normalizedInterim === lastInterimTranscript &&
+        now - lastInterimSeenAt < INTERIM_REPEAT_SUPPRESS_MS;
+
+      if (!isRepeatedInterim) {
+        interimBuffer = interimTranscript;
+        lastInterimTranscript = normalizedInterim;
+        lastInterimSeenAt = now;
+        scheduleSilenceFlush();
+      }
     }
 
     if (finalTranscript.trim()) {
       sentenceBuffer += (sentenceBuffer ? ' ' : '') + finalTranscript.trim();
       interimBuffer = '';
+      lastInterimTranscript = '';
+      lastInterimSeenAt = 0;
       clearSilenceFlush();
       flushCompleteSentencesFromBuffer();
     }
@@ -710,6 +744,8 @@ function stopListening() {
   resetCommitPipeline();
   clearSilenceFlush();
   interimBuffer = '';
+  lastInterimTranscript = '';
+  lastInterimSeenAt = 0;
   sentenceBuffer = '';
 
   updateStatus('⏹️ Stopped listening', 'idle');
@@ -737,6 +773,8 @@ function pauseInterpretation() {
   resetCommitPipeline();
   clearSilenceFlush();
   interimBuffer = '';
+  lastInterimTranscript = '';
+  lastInterimSeenAt = 0;
   sentenceBuffer = '';
 
   // IMPORTANT: do NOT clear videoQueue here — we want to continue where we left off.
@@ -811,6 +849,8 @@ function clearTranscript() {
 
   resetCommitPipeline();
   interimBuffer = '';
+  lastInterimTranscript = '';
+  lastInterimSeenAt = 0;
   sentenceBuffer = '';
   clearSilenceFlush();
 
@@ -905,9 +945,9 @@ function applyAdaptiveSpeed() {
 
   const q = videoQueue.length;
 
-  if (q > 12) playbackSpeed.value = "2.5";
+  if (q > 12) playbackSpeed.value = "3";
   else if (q > 6) playbackSpeed.value = "3";
-  else playbackSpeed.value = "1.75";
+  else playbackSpeed.value = "3";
 
   const rate = parseFloat(playbackSpeed.value || "1");
   smoothPlayer.updateRates(rate);
@@ -959,6 +999,10 @@ function setCachedAslMatch(word, value) {
 function generateLookupCandidates(word) {
   const candidates = [];
   const seen = new Set();
+  const directAliases = {
+    writer: ['write'],
+    correction: ['correct']
+  };
 
   const add = (candidate) => {
     const normalized = (candidate || '').trim().toLowerCase();
@@ -968,6 +1012,8 @@ function generateLookupCandidates(word) {
   };
 
   add(word);
+
+  (directAliases[word] || []).forEach(add);
 
   if (word.length > 4 && word.endsWith('ies')) {
     add(`${word.slice(0, -3)}y`);
@@ -983,10 +1029,13 @@ function generateLookupCandidates(word) {
   const suffixRules = [
     ['ing', (w) => [w.slice(0, -3), `${w.slice(0, -3)}e`, ...maybeDropDoubledTail(w.slice(0, -3))]],
     ['ed', (w) => [w.slice(0, -2), w.slice(0, -1), `${w.slice(0, -2)}e`, ...maybeDropDoubledTail(w.slice(0, -2))]],
+    ['ment', (w) => [w.slice(0, -4), `${w.slice(0, -4)}e`]],
+    ['ness', (w) => [w.slice(0, -4)]],
     ['es', (w) => [w.slice(0, -2), w.slice(0, -1)]],
     ['s', (w) => [w.slice(0, -1)]],
     ['ly', (w) => [w.slice(0, -2)]],
-    ['er', (w) => [w.slice(0, -2)]],
+    ['er', (w) => [w.slice(0, -2), `${w.slice(0, -2)}e`]],
+    ['or', (w) => [w.slice(0, -2), `${w.slice(0, -2)}e`]],
     ['est', (w) => [w.slice(0, -3)]]
   ];
 
@@ -998,10 +1047,38 @@ function generateLookupCandidates(word) {
   return candidates;
 }
 
+function resolveFromManifest(word) {
+  if (!isSignManifestLoaded || signManifest.size === 0) return null;
+
+  for (const candidate of generateLookupCandidates(word)) {
+    const videoUrl = signManifest.get(candidate);
+    if (!videoUrl) continue;
+
+    return {
+      requestedWord: word,
+      resolvedWord: candidate,
+      videoUrl
+    };
+  }
+
+  return null;
+}
+
 async function fetchBestAslMatch(word) {
   const cached = getCachedAslMatch(word);
   if (cached !== undefined) {
     return cached;
+  }
+
+  const manifestMatch = resolveFromManifest(word);
+  if (manifestMatch) {
+    setCachedAslMatch(word, manifestMatch);
+    return manifestMatch;
+  }
+
+  if (isSignManifestLoaded) {
+    setCachedAslMatch(word, null);
+    return null;
   }
 
   for (const candidate of generateLookupCandidates(word)) {
