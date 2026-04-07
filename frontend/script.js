@@ -23,6 +23,7 @@ const MAX_WORDS_WITHOUT_PUNCTUATION = 20;
 const HARD_SENTENCE_PUNCTUATION = '.!?';
 const SOFT_SENTENCE_PUNCTUATION = ',;:';
 const MIN_WORDS_FOR_SOFT_BREAK = 3;
+const MAX_PHRASE_WORDS = 3;
 
 // Adaptive “sign budget” per committed sentence
 // (how many words from the sentence we will try to sign)
@@ -971,6 +972,57 @@ function tokenizeInSpokenOrder(text) {
     .filter(Boolean);
 }
 
+async function buildSignUnits(text, budget) {
+  const tokens = tokenizeInSpokenOrder(text);
+  const units = [];
+
+  for (let i = 0; i < tokens.length && units.length < budget;) {
+    let phraseMatch = null;
+    const maxPhraseLength = Math.min(MAX_PHRASE_WORDS, tokens.length - i);
+
+    for (let phraseLength = maxPhraseLength; phraseLength >= 2; phraseLength--) {
+      const spokenText = tokens.slice(i, i + phraseLength).join(' ');
+      const match = await fetchBestAslMatch(spokenText);
+      if (!match?.videoUrl) continue;
+
+      phraseMatch = { spokenText, match, phraseLength };
+      break;
+    }
+
+    if (phraseMatch) {
+      units.push({
+        type: 'resolved',
+        spokenText: phraseMatch.spokenText,
+        match: phraseMatch.match
+      });
+      i += phraseMatch.phraseLength;
+      continue;
+    }
+
+    const word = tokens[i];
+    if (!isStopword(word)) {
+      units.push({
+        type: 'single',
+        word
+      });
+      i += 1;
+      continue;
+    }
+
+    const stopwordMatch = await fetchBestAslMatch(word);
+    if (stopwordMatch?.videoUrl) {
+      units.push({
+        type: 'resolved',
+        spokenText: word,
+        match: stopwordMatch
+      });
+    }
+    i += 1;
+  }
+
+  return units;
+}
+
 function getCachedAslMatch(word) {
   if (!aslLookupCache.has(word)) return undefined;
 
@@ -1134,19 +1186,24 @@ function enqueueVideoItem(item) {
 async function processText(text) {
   if (isPaused) return;
 
-  let words = tokenizeInSpokenOrder(text);
-
-  // Remove stopwords but keep spoken order
-  words = words.filter(w => !isStopword(w));
-
-  // Adaptive budget
   const budget = getAdaptiveSignBudget();
-  words = words.slice(0, budget);
+  const signUnits = await buildSignUnits(text, budget);
 
   const missingWordsList = [];
   const missingSet = new Set();
 
-  for (const word of words) {
+  for (const unit of signUnits) {
+    if (unit.type === 'resolved') {
+      enqueueVideoItem({
+        type: 'word',
+        value: unit.match.resolvedWord,
+        source: unit.spokenText,
+        videoUrl: unit.match.videoUrl
+      });
+      continue;
+    }
+
+    const word = unit.word;
     try {
       const match = await fetchBestAslMatch(word);
       if (match) {
