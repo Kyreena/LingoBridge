@@ -76,7 +76,47 @@ def list_sessions(db_path: str, limit: int = 50):
             """,
             (limit,),
         ).fetchall()
-    return [dict(r) for r in rows]
+        sessions = [dict(r) for r in rows]
+
+        if not sessions:
+            return sessions
+
+        session_ids = [session["id"] for session in sessions]
+        placeholders = ",".join("?" for _ in session_ids)
+        event_rows = conn.execute(
+            f"""
+            SELECT session_id, payload
+            FROM events
+            WHERE type = 'missing_word'
+              AND session_id IN ({placeholders})
+            ORDER BY id DESC
+            """,
+            session_ids,
+        ).fetchall()
+
+    missing_by_session = {session_id: {} for session_id in session_ids}
+    for row in event_rows:
+        payload = row["payload"] or "{}"
+        try:
+            word = (json.loads(payload).get("word") or "").strip().lower()
+        except json.JSONDecodeError:
+            continue
+
+        if not word:
+            continue
+
+        session_counts = missing_by_session.setdefault(row["session_id"], {})
+        session_counts[word] = session_counts.get(word, 0) + 1
+
+    for session in sessions:
+        items = [
+            {"word": word, "count": count}
+            for word, count in missing_by_session.get(session["id"], {}).items()
+        ]
+        items.sort(key=lambda item: (-item["count"], item["word"]))
+        session["missing_words"] = items
+
+    return sessions
 
 def summary(db_path: str):
     with connect(db_path) as conn:

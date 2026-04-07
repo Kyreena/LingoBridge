@@ -9,39 +9,131 @@
 <body class="dashboard-page">
   <header class="header">
     <h1>LingoBridge Dashboard</h1>
-    <p>Session logging & analytics (privacy-safe)</p>
+    <p>Session logging and analytics for classroom translation performance.</p>
     <div class="header-actions">
-      <a class="btn btn-secondary" href="/">← Back</a>
+      <a class="btn btn-secondary" href="/">&larr; Back</a>
     </div>
   </header>
 
   <div class="app">
-    <main role="main">
-      <section class="hero hero-dashboard" aria-label="Analytics overview">
+    <main class="dashboard-main" role="main">
+      <section class="hero hero-dashboard hero-dashboard-compact" aria-label="Analytics overview">
         <div class="hero-copy">
           <span class="hero-eyebrow">Analytics Overview</span>
           <h2>See what the system understood, what it missed, and what to improve next.</h2>
           <p>The dashboard turns live sessions into practical feedback so you can prioritize new signs, monitor usage, and tune the classroom experience over time.</p>
         </div>
-        <div class="hero-chips" aria-label="Analytics highlights">
-          <span class="app-chip">Top missing words</span>
-          <span class="app-chip">Recent sessions</span>
-          <span class="app-chip">Usage summary</span>
-        </div>
       </section>
 
-      <section class="card dashboard-card">
+      <section class="dashboard-flow" aria-label="Dashboard guide">
+        <a class="flow-card flow-link" href="#summarySection">
+          <span class="flow-step">01</span>
+          <div>
+            <h2>Check coverage</h2>
+            <p>Use the summary to see how much of spoken content is becoming signed output.</p>
+          </div>
+        </a>
+        <a class="flow-card flow-link" href="#missingWordsSection">
+          <span class="flow-step">02</span>
+          <div>
+            <h2>Spot the gaps</h2>
+            <p>Use Top Missing Words to decide which new ASL clips will reduce fingerspelling fastest.</p>
+          </div>
+        </a>
+        <a class="flow-card flow-link" href="#sessionsSection">
+          <span class="flow-step">03</span>
+          <div>
+            <h2>Review sessions</h2>
+            <p>Use the session table to see which exact words were fingerspelled in each run.</p>
+          </div>
+        </a>
+      </section>
+
+      <section class="card dashboard-card" id="summarySection">
         <h2>Summary</h2>
-        <div id="summary" class="stats-bar" style="display:flex;"></div>
+        <div id="summary" class="dashboard-summary"></div>
       </section>
 
-      <section class="card dashboard-card">
-        <h2>Top Missing Words</h2>
-        <ul id="topMissingWords" class="insight-list"></ul>
+      <section class="card dashboard-card" id="prioritySection">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Priority this week</p>
+            <h2>Recent Words To Add</h2>
+          </div>
+          <span class="section-note">Based on the most recent sessions only, so you can work from the newest classroom gaps first.</span>
+        </div>
+        <div id="priorityWordsPanel" class="priority-panel" aria-live="polite"></div>
       </section>
 
-      <section class="card dashboard-card">
-        <h2>Recent Sessions</h2>
+      <section class="dashboard-grid" aria-label="Analytics charts">
+        <section class="card dashboard-card" id="missingWordsSection">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Needs attention</p>
+              <h2>Top Missing Words</h2>
+            </div>
+            <span class="section-note">Most repeated gaps across recent sessions</span>
+          </div>
+          <div id="missingWordsChart" class="chart-area bar-chart" aria-live="polite"></div>
+        </section>
+
+        <section class="card dashboard-card" id="sessionActivitySection">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Recent rhythm</p>
+              <h2>Session Activity</h2>
+            </div>
+            <span class="section-note">Words, signs and fingerspelling across the latest sessions</span>
+          </div>
+          <div id="sessionActivity" class="chart-area session-chart" aria-live="polite"></div>
+          <div id="sessionHighlights" class="mini-stats"></div>
+        </section>
+      </section>
+
+      <section class="card dashboard-card" id="sessionsSection">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Detailed log</p>
+            <h2>Recent Sessions</h2>
+          </div>
+          <span class="section-note">Tip: run a demo or start or stop listening to generate sessions.</span>
+        </div>
+        <div class="dashboard-callout" role="note">
+          <strong>What this helps with:</strong>
+          Open <em>Details</em> on any session to see the exact fingerspelled words you should look for next when adding videos to your dataset.
+        </div>
+        <div class="sessions-toolbar" aria-label="Session controls">
+          <div class="sessions-filters" role="tablist" aria-label="Session filters">
+            <button class="session-filter is-active" type="button" data-filter="all">All</button>
+            <button class="session-filter" type="button" data-filter="live">Live</button>
+            <button class="session-filter" type="button" data-filter="demo">Demo</button>
+            <button class="session-filter" type="button" data-filter="fingerspelled">Has fingerspelling</button>
+          </div>
+          <div class="sessions-search">
+            <label class="sessions-search-label" for="sessionsSearchInput">Search</label>
+            <input
+              id="sessionsSearchInput"
+              class="sessions-search-input"
+              type="search"
+              placeholder="Search missing words or mode"
+              autocomplete="off"
+            />
+          </div>
+          <div class="sessions-range">
+            <label class="sessions-range-label" for="sessionsDateRange">Range</label>
+            <select id="sessionsDateRange" class="sessions-range-select">
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="all">All time</option>
+            </select>
+          </div>
+          <div class="sessions-pagination">
+            <span id="sessionsPaginationLabel" class="sessions-page-label">Showing 0-0 of 0</span>
+            <button id="sessionsPrevBtn" class="session-page-btn" type="button">Previous</button>
+            <button id="sessionsNextBtn" class="session-page-btn" type="button">Next</button>
+          </div>
+        </div>
         <div class="table-shell">
           <table class="table" id="sessionsTable">
             <thead>
@@ -51,17 +143,14 @@
                 <th>Mode</th>
                 <th>Words</th>
                 <th>Signs</th>
-                <th>Fingerspelled</th>
                 <th>Pauses</th>
                 <th>Resumes</th>
+                <th>View</th>
               </tr>
             </thead>
             <tbody></tbody>
           </table>
         </div>
-        <p style="opacity:0.8; margin-top: 12px;">
-          Tip: run a demo or start/stop listening to generate sessions.
-        </p>
       </section>
     </main>
   </div>
