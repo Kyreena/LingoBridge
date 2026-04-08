@@ -1719,3 +1719,122 @@ input:focus-visible {
     .card              { box-shadow: none; border: 1px solid #ddd; }
     .card::before      { display: none; }
 }
+
+/* =========================
+   SERVER STATUS DOT  (header)
+========================= */
+.header-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* Server status pill */
+.server-status {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 13px 5px 10px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--radius-pill);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background var(--dur-base) var(--ease-out);
+}
+
+/* The dot itself */
+.server-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+/* Unknown / checking */
+.server-dot--unknown {
+    background: #94a3b8;
+}
+
+/* Connected — green with pulse animation */
+.server-dot--connected {
+    background: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.30);
+    animation: dot-pulse 2.2s ease-in-out infinite;
+}
+
+/* Disconnected — red */
+.server-dot--disconnected {
+    background: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+}
+
+@keyframes dot-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.30); }
+    50%       { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.10); }
+}
+
+/* Label next to the dot */
+.server-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.80);
+    transition: color 0.35s ease;
+}
+
+.server-label--connected    { color: #6ee7b7; }   /* light green  */
+.server-label--disconnected { color: #fca5a5; }   /* light red    */
+
+/* =========================
+   BUTTON SVG ICONS
+========================= */
+/* Inline SVGs inside buttons sit on the baseline like text */
+.btn-svg {
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+    margin-right: 4px;
+    pointer-events: none;
+}
+
+/* Header icon buttons hold SVGs not text — reset sizing */
+.btn-icon svg {
+    display: block;
+    pointer-events: none;
+}
+
+/* Hand SVG in the video placeholder */
+.icon-hand {
+    opacity: 0.35;
+    margin-bottom: 8px;
+}
+
+/* Dark/light toggle — show correct icon per mode */
+.icon-sun  { display: none;  }
+.icon-moon { display: block; }
+
+.dark-mode .icon-sun  { display: block; }
+.dark-mode .icon-moon { display: none;  }
+
+/* Dark mode — server-status pill */
+.dark-mode .server-status {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.10);
+}
+
+/* Responsive: hide server label on very small screens */
+@media (max-width: 480px) {
+    .server-label { display: none; }
+    .server-status { padding: 6px; }
+    .header-brand p { display: none; }
+}
