@@ -6,7 +6,7 @@
 // CONFIGURATION
 // --------------------------
 const API_BASE_URL = window.location.origin;
-const DEMO_TEXT = "Hello my name is Halima. I love learning sign language. Thank you for watching.";
+const DEMO_TEXT = "Good morning class—settle in quickly, we’ve got a challenge today. I want you to imagine you’re problem-solvers in a real-world situation: a city has just experienced severe flooding, and your task is to come up with practical solutions to prevent it from happening again. Take out your notebooks and write the heading ‘Urban Flood Management.’ You’ll work in small groups, and each group must identify one cause of flooding, one immediate solution, and one long-term strategy. Think beyond the obvious—consider waste management, drainage systems, and even community behavior. In ten minutes, I’ll call on each group to present, so assign roles now: a speaker, a writer, and a timekeeper. Remember, this is about critical thinking and teamwork, not perfection. Alright, go ahead—discuss, debate, and build your ideas. ";
 
 // Silence timer (used only for fallback flushing when punctuation isn't coming through)
 const COMMIT_SILENCE_MS = 700;
@@ -85,6 +85,8 @@ const playbackSpeed = document.getElementById('playbackSpeed');
 const wordCount = document.getElementById('wordCount');
 const signCount = document.getElementById('signCount');
 const totalSigns = document.getElementById('totalSigns');
+const serverDot = document.getElementById('serverDot');
+const serverLabel = document.getElementById('serverLabel');
 
 // Optional translation display (safe to remove from HTML)
 const currentSentence = document.getElementById('currentSentence');
@@ -1396,11 +1398,21 @@ async function checkServerHealth() {
     const data = await response.json();
 
     totalSigns.textContent = data.total_signs || 0;
-    updateStatus('✅ Connected to server', 'success');
+
+    // Green dot + label
+    if (serverDot)   serverDot.className   = 'server-dot server-dot--connected';
+    if (serverLabel) { serverLabel.textContent = 'Connected'; serverLabel.className = 'server-label server-label--connected'; }
+
+    updateStatus('Ready', 'success');
   } catch (error) {
     console.error('Server not reachable:', error);
-    updateStatus('⚠️ Backend server not connected', 'warning');
-    totalSigns.textContent = '⚠️';
+
+    // Red dot + label
+    if (serverDot)   serverDot.className   = 'server-dot server-dot--disconnected';
+    if (serverLabel) { serverLabel.textContent = 'Server offline'; serverLabel.className = 'server-label server-label--disconnected'; }
+
+    updateStatus('Backend not connected — video signs unavailable', 'warning');
+    totalSigns.textContent = '—';
   }
 }
 
@@ -1424,7 +1436,9 @@ function toggleDarkMode() {
 
 function updateDarkModeIcon() {
   const isDark = document.body.classList.contains('dark-mode');
-  darkModeToggle.textContent = isDark ? '☀️' : '🌙';
+  // Icons are now SVGs shown/hidden via CSS — just update accessibility labels
+  darkModeToggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+  darkModeToggle.setAttribute('title',      isDark ? 'Switch to light mode' : 'Switch to dark mode');
 }
 
 // --------------------------

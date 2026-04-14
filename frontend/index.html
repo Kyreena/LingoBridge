@@ -7,23 +7,23 @@
     <meta name="description" content="Web-based real-time speech-to-sign language translation system for inclusive classroom communication. Converts spoken English to ASL video signs instantly.">
     <meta name="keywords" content="ASL, sign language, speech recognition, inclusive education, accessibility, deaf education, real-time translation">
     <meta name="author" content="LingoBridge">
-    
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://kyreena.github.io/LingoBridge/">
     <meta property="og:title" content="LingoBridge - Speech to ASL Translation">
     <meta property="og:description" content="Real-time speech-to-sign language translation system for inclusive classroom communication">
     <meta property="og:image" content="https://kyreena.github.io/LingoBridge/favicon.svg">
-    
+
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://kyreena.github.io/LingoBridge/">
     <meta property="twitter:title" content="LingoBridge - Speech to ASL Translation">
     <meta property="twitter:description" content="Real-time speech-to-sign language translation system for inclusive classroom communication">
-    
+
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    
+
     <!-- Structured Data -->
     <script type="application/ld+json">
     {
@@ -33,19 +33,10 @@
         "description": "Real-time speech-to-sign language translation system for inclusive education",
         "applicationCategory": "EducationalApplication",
         "operatingSystem": "Web Browser",
-        "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "USD"
-        },
-        "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": "5",
-            "ratingCount": "1"
-        }
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
     }
     </script>
-    
+
     <!-- CSS -->
     <link rel="stylesheet" href="style.css" />
 </head>
@@ -53,19 +44,65 @@
 
     <!-- ================= HEADER ================= -->
     <header class="header">
-        <h1>LingoBridge</h1>
-        <p>Real-time Speech to ASL Interpretation for Inclusive Learning</p>
-        <div class="header-actions">
-            <button id="darkModeToggle" class="btn-icon" aria-label="Toggle dark mode" title="Toggle dark mode">
-                🌙
-            </button>
-            <button id="helpBtn" class="btn-icon" aria-label="Show help" title="Show help">
-                ❓
-            </button>
-            <button id="settingsBtn" class="btn-icon" aria-label="Open settings" title="Open settings">
-                ⚙️
-            </button>
-            <a href="/dashboard.html" class="btn-icon" aria-label="Open dashboard" title="Dashboard">📊</a>
+        <div class="header-brand">
+            <h1>LingoBridge</h1>
+            <p>Real-time Speech to ASL Interpretation for Inclusive Learning</p>
+        </div>
+
+        <div class="header-right">
+            <!-- Server connection status pill — top right, always visible -->
+            <div id="serverStatus" class="server-status" title="Backend server status">
+                <span id="serverDot" class="server-dot server-dot--unknown"></span>
+                <span id="serverLabel" class="server-label">Connecting&hellip;</span>
+            </div>
+
+            <div class="header-actions">
+                <!-- Dark mode toggle — shows moon in light mode, sun in dark mode -->
+                <button id="darkModeToggle" class="btn-icon" aria-label="Switch to dark mode" title="Toggle dark mode">
+                    <!-- Moon (light mode) -->
+                    <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                    <!-- Sun (dark mode) -->
+                    <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="5"/>
+                        <line x1="12" y1="1"  x2="12" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="23"/>
+                        <line x1="4.22" y1="4.22"  x2="5.64" y2="5.64"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                        <line x1="1"  y1="12" x2="3"  y2="12"/>
+                        <line x1="21" y1="12" x2="23" y2="12"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                </button>
+
+                <!-- Help -->
+                <button id="helpBtn" class="btn-icon" aria-label="Show help" title="Show help">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </button>
+
+                <!-- Settings -->
+                <button id="settingsBtn" class="btn-icon" aria-label="Open settings" title="Open settings">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                </button>
+
+                <!-- Dashboard link -->
+                <a href="/dashboard.html" class="btn-icon" aria-label="Open dashboard" title="Dashboard">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="18" y1="20" x2="18" y2="10"/>
+                        <line x1="12" y1="20" x2="12" y2="4"/>
+                        <line x1="6"  y1="20" x2="6"  y2="14"/>
+                    </svg>
+                </a>
+            </div>
         </div>
     </header>
 
@@ -84,36 +121,85 @@
                     <span class="app-chip">Missing-word tracking</span>
                 </div>
             </section>
+
             <!-- Controls Section -->
             <section class="controls" role="toolbar" aria-label="Main controls">
+
+                <!-- Start Listening — microphone -->
                 <button id="startBtn" class="btn btn-primary" aria-label="Start listening to speech">
-                    <span class="icon" aria-hidden="true">🎤</span> Start Listening
+                    <svg class="btn-svg" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="23"/>
+                        <line x1="8"  y1="23" x2="16" y2="23"/>
+                    </svg>
+                    Start Listening
                 </button>
+
+                <!-- Stop — square -->
                 <button id="stopBtn" class="btn btn-secondary" disabled aria-label="Stop listening">
-                    <span class="icon" aria-hidden="true">⏹️</span> Stop
+                    <svg class="btn-svg" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    </svg>
+                    Stop
                 </button>
-                 <button id="pauseBtn" class="btn btn-tertiary" disabled aria-label="Pause interpretation">
-                    <span class="icon" aria-hidden="true">⏸️</span> Pause
+
+                <!-- Pause -->
+                <button id="pauseBtn" class="btn btn-tertiary" disabled aria-label="Pause interpretation">
+                    <svg class="btn-svg" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                        <line x1="6"  y1="4" x2="6"  y2="20"/>
+                        <line x1="18" y1="4" x2="18" y2="20"/>
+                    </svg>
+                    Pause
                 </button>
-  
+
+                <!-- Resume — play -->
                 <button id="resumeBtn" class="btn btn-primary" disabled aria-label="Resume interpretation">
-                    <span class="icon" aria-hidden="true">▶️</span> Resume
+                    <svg class="btn-svg" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    Resume
                 </button>
-                
+
+                <!-- Demo — film strip -->
                 <button id="demoBtn" class="btn btn-demo" aria-label="Start demo mode">
-                    <span class="icon" aria-hidden="true">🎬</span> Demo
+                    <svg class="btn-svg" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="2" y="2" width="20" height="20" rx="2.18"/>
+                        <line x1="7"  y1="2"  x2="7"  y2="22"/>
+                        <line x1="17" y1="2"  x2="17" y2="22"/>
+                        <line x1="2"  y1="12" x2="22" y2="12"/>
+                        <line x1="2"  y1="7"  x2="7"  y2="7"/>
+                        <line x1="2"  y1="17" x2="7"  y2="17"/>
+                        <line x1="17" y1="17" x2="22" y2="17"/>
+                        <line x1="17" y1="7"  x2="22" y2="7"/>
+                    </svg>
+                    Demo
                 </button>
+
+                <!-- Clear — trash -->
                 <button id="clearBtn" class="btn btn-tertiary" aria-label="Clear transcript">
-                    <span class="icon" aria-hidden="true">🗑️</span> Clear
+                    <svg class="btn-svg" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                    </svg>
+                    Clear
                 </button>
+
+                <!-- Download — download arrow -->
                 <button id="downloadBtn" class="btn btn-download" aria-label="Download transcript">
-                    <span class="icon" aria-hidden="true">⬇️</span> Download
+                    <svg class="btn-svg" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download
                 </button>
+
             </section>
-            
+
             <!-- Status -->
             <div id="status" class="status" role="status" aria-live="polite">Ready to start</div>
-            
+
             <!-- Statistics Bar -->
             <section class="stats-bar summary-strip" role="region" aria-label="Statistics">
                 <div class="stat-item">
@@ -129,14 +215,15 @@
                     <span id="totalSigns" class="stat-value">0</span>
                 </div>
             </section>
-            
+
             <!-- Main Content Grid -->
             <div class="main-content">
+
                 <!-- Transcript Panel -->
                 <section class="card transcript-panel feature-card" role="region" aria-label="Live transcript">
                     <h2>Live Transcript</h2>
                     <div id="transcript" class="transcript transcript-lyrics" role="log" aria-live="polite">
-                        <p class="placeholder">Spoken words will appear here...</p>
+                        <p class="placeholder">Spoken words will appear here&hellip;</p>
                     </div>
                 </section>
 
@@ -144,8 +231,11 @@
                 <section class="card video-panel feature-card" role="region" aria-label="ASL video translation">
                     <h2>ASL Translation</h2>
                     <div class="video-controls">
+                        <!-- Fullscreen -->
                         <button id="fullscreenBtn" class="btn-icon" aria-label="Toggle fullscreen" title="Fullscreen">
-                            <span aria-hidden="true">⛶</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                            </svg>
                         </button>
                         <label for="playbackSpeed" class="sr-only">Playback speed</label>
                         <select id="playbackSpeed" class="speed-control" aria-label="Video playback speed">
@@ -160,30 +250,38 @@
                             <option value="3" selected>3x</option>
                         </select>
                     </div>
+
                     <div id="videoContainer" class="video-container">
                         <div class="video-placeholder">
-                            <span class="icon-large" aria-hidden="true">👋</span>
+                            <svg class="icon-hand" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M18 11V6a2 2 0 0 0-4 0v0"/>
+                                <path d="M14 10V4a2 2 0 0 0-4 0v2"/>
+                                <path d="M10 10.5V6a2 2 0 0 0-4 0v8"/>
+                                <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L8 15"/>
+                            </svg>
                             <p>ASL signs will be displayed here</p>
                         </div>
-                        
+
                         <video id="aslVideoA" class="asl-video" playsinline preload="auto" muted></video>
                         <video id="aslVideoB" class="asl-video" playsinline preload="auto" muted></video>
                     </div>
-                    
+
                     <div id="currentWord" class="current-word" role="status" aria-live="polite"></div>
                 </section>
+
             </div>
         </main>
+
         <!-- Footer -->
         <footer role="contentinfo">
-            <p>LingoBridge - Supporting inclusive education through technology</p>
+            <p>LingoBridge &mdash; Supporting inclusive education through technology</p>
             <p class="keyboard-shortcuts">
-                <small>Keyboard shortcuts: <kbd>Space</kbd> Start/Stop | <kbd>Esc</kbd> Clear | <kbd>D</kbd> Demo | <kbd>?</kbd> Help</small>
+                <small>Keyboard shortcuts: <kbd>Space</kbd> Start/Stop &nbsp;|&nbsp; <kbd>Esc</kbd> Clear &nbsp;|&nbsp; <kbd>D</kbd> Demo &nbsp;|&nbsp; <kbd>?</kbd> Help</small>
             </p>
         </footer>
     </div>
 
-    <!-- Help Modal -->
+    <!-- ================= HELP MODAL ================= -->
     <div id="helpModal" class="modal" role="dialog" aria-labelledby="helpModalTitle" aria-modal="true" hidden>
         <div class="modal-content">
             <div class="modal-header">
@@ -198,37 +296,37 @@
                     <li>Speak clearly into your microphone</li>
                     <li>Watch ASL signs appear automatically</li>
                 </ol>
-                
+
                 <h3>Features</h3>
                 <ul>
                     <li><strong>Demo Mode:</strong> Test the system without a microphone</li>
                     <li><strong>Download:</strong> Save your transcript as a text file</li>
                     <li><strong>Dark Mode:</strong> Toggle for comfortable viewing</li>
-                    <li><strong>Playback Speed:</strong> Adjust video speed (0.5x - 3x)</li>
+                    <li><strong>Playback Speed:</strong> Adjust video speed (0.5x &ndash; 3x)</li>
                     <li><strong>Fullscreen:</strong> Expand video for better visibility</li>
                 </ul>
-                
+
                 <h3>Keyboard Shortcuts</h3>
                 <ul>
-                    <li><kbd>Space</kbd> - Start/Stop listening</li>
-                    <li><kbd>Esc</kbd> - Clear transcript</li>
-                    <li><kbd>D</kbd> - Start demo mode</li>
-                    <li><kbd>S</kbd> - Download transcript</li>
-                    <li><kbd>?</kbd> - Show this help</li>
+                    <li><kbd>Space</kbd> &mdash; Start / Stop listening</li>
+                    <li><kbd>Esc</kbd> &mdash; Clear transcript</li>
+                    <li><kbd>D</kbd> &mdash; Start demo mode</li>
+                    <li><kbd>S</kbd> &mdash; Download transcript</li>
+                    <li><kbd>?</kbd> &mdash; Show this help</li>
                 </ul>
-                
+
                 <h3>Tips for Best Results</h3>
                 <ul>
                     <li>Speak clearly and at a moderate pace</li>
-                    <li>Use common words</li>
+                    <li>Use common words found in everyday speech</li>
                     <li>Ensure good microphone quality</li>
-                    <li>Minimize background noise</li>
+                    <li>Minimise background noise</li>
                 </ul>
             </div>
         </div>
     </div>
 
-    <!-- Settings Modal -->
+    <!-- ================= SETTINGS MODAL ================= -->
     <div id="settingsModal" class="modal" role="dialog" aria-labelledby="settingsModalTitle" aria-modal="true" hidden>
         <div class="modal-content">
             <div class="modal-header">
@@ -245,22 +343,22 @@
                         <option value="x-large">Extra Large</option>
                     </select>
                 </div>
-                
+
                 <div class="setting-group">
                     <label for="autoPlay">Auto-play ASL Videos</label>
                     <input type="checkbox" id="autoPlay" checked>
                 </div>
-                
+
                 <div class="setting-group">
                     <label for="highlightWords">Highlight Words with Signs</label>
                     <input type="checkbox" id="highlightWords" checked>
                 </div>
-                
+
                 <div class="setting-group">
                     <label for="showStats">Show Statistics Bar</label>
                     <input type="checkbox" id="showStats" checked>
                 </div>
-                
+
                 <div class="setting-actions">
                     <button id="saveSettings" class="btn btn-primary">Save Settings</button>
                     <button id="resetSettings" class="btn btn-secondary">Reset to Defaults</button>
